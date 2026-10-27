@@ -1,24 +1,18 @@
-"""IOH-based problem interface.
+"""Benchmark problems.
 
-Every problem in bench-atlas is an ``ioh`` real-valued single-objective problem.
-This module only adds what IOH does not provide out of the box:
-
-- a stable :class:`ProblemId` (IOH meta data does not know which suite a problem
-  belongs to),
-- normalization of the search domain to [0, 1]^d,
-- BBOB-style instances for problems without native instances.
-
-See ``docs/ioh-deviations.md`` for the rationale behind each addition.
+A :class:`Problem` is a vectorized objective on [0, 1]^d with a stable
+:class:`ProblemId`, an optional known optimum and an evaluation counter. IOH is
+used as a source of benchmark functions (:func:`from_ioh`), not as the problem
+interface.
 """
 
 from __future__ import annotations
 
+import functools
 import re
-import weakref
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
-import ioh
 import numpy as np
 
 if TYPE_CHECKING:
@@ -27,16 +21,14 @@ if TYPE_CHECKING:
     from numpy.typing import ArrayLike
 
 __all__ = [
+    "Problem",
     "ProblemId",
+    "from_function",
+    "from_ioh",
     "from_unit",
     "make_instance",
-    "normalize",
-    "problem_id",
     "to_unit",
-    "wrap",
 ]
-
-Problem = ioh.iohcpp.problem.RealSingleObjective
 
 _ID_PATTERN = re.compile(
     r"^(?P<suite>.+)_f(?P<function>\d+)_i(?P<instance>\d+)_d(?P<dimension>\d+)$"
@@ -69,15 +61,41 @@ class ProblemId:
         )
 
 
-def problem_id(problem: Problem, suite: str) -> ProblemId:
-    """Build the :class:`ProblemId` of an IOH problem from its meta data."""
-    meta = problem.meta_data
-    return ProblemId(
-        suite=suite,
-        function=meta.problem_id,
-        instance=meta.instance,
-        dimension=meta.n_variables,
-    )
+@dataclass(eq=False)
+class Problem:
+    """Minimization problem on [0, 1]^d.
+
+    Calling the problem with a single point ``(d,)`` returns a float; calling it
+    with a batch ``(n, d)`` returns an array ``(n,)``. Every evaluated point is
+    counted in ``evaluations``.
+
+    Attributes:
+        id: Stable problem identifier; ``id.dimension`` is the dimension.
+        function: Vectorized objective, ``(n, d)`` points on [0, 1]^d -> ``(n,)``.
+        name: Human-readable name.
+        optimum: Known global optimum ``(x, f)`` with ``x`` on [0, 1]^d.
+        evaluations: Number of evaluated points.
+    """
+
+    id: ProblemId
+    function: Callable[[np.ndarray], np.ndarray] = field(repr=False)
+    name: str = ""
+    optimum: tuple[np.ndarray, float] | None = None
+    evaluations: int = 0
+
+    @property
+    def dimension(self) -> int:
+        return self.id.dimension
+
+    def __call__(self, x: ArrayLike) -> float | np.ndarray:
+        x = np.asarray(x, dtype=float)
+        single = x.ndim == 1
+        points = np.atleast_2d(x)
+        if points.ndim != 2 or points.shape[1] != self.dimension:
+            raise ValueError(f"Expected points of dimension {self.dimension}, got {x.shape}")
+        y = np.asarray(self.function(points), dtype=float)
+        self.evaluations += len(points)
+        return float(y[0]) if single else y
 
 
 def to_unit(x: ArrayLike, lb: ArrayLike, ub: ArrayLike) -> np.ndarray:
@@ -92,120 +110,121 @@ def from_unit(u: ArrayLike, lb: ArrayLike, ub: ArrayLike) -> np.ndarray:
     return lb + np.asarray(u, dtype=float) * (ub - lb)
 
 
-def _registry_name(suite: str, name: str, function_id: int, instance: int, dimension: int) -> str:
-    # ``ioh.wrap_problem`` registers problems globally by name. A repeated name
-    # only replaces the registry entry; already created problem objects keep
-    # their own function.
-    return f"{suite}/{name}/f{function_id}/i{instance}/d{dimension}"
+@dataclass(frozen=True, eq=False)
+class _BoxFunction:
+    """``u -> base(R (x - shift) + x_opt) + offset`` with ``x = from_unit(u)``.
 
-
-def _keep_alive(problem: Problem, *objects: object) -> None:
-    # ``ioh.wrap_problem`` does not hold references to the Python callbacks it
-    # is given (ioh 0.3.22): once they are garbage collected, calling the problem
-    # segfaults. Tie their lifetime to the problem object instead.
-    weakref.finalize(problem, lambda *_: None, *objects)
-
-
-def wrap(
-    function: Callable[[np.ndarray], float],
-    *,
-    suite: str,
-    name: str,
-    function_id: int,
-    dimension: int,
-    lb: ArrayLike,
-    ub: ArrayLike,
-    instance: int = 1,
-    optimum: tuple[ArrayLike, float] | None = None,
-    transform: Callable[[np.ndarray], np.ndarray] | None = None,
-    objective_offset: float = 0.0,
-) -> Problem:
-    """Wrap a callable defined on [lb, ub] as an IOH problem on [0, 1]^d.
-
-    The domain mapping and the optional ``transform`` / ``objective_offset`` are
-    applied through IOH's ``transform_variables`` / ``transform_objectives`` hooks.
-
-    Args:
-        function: Objective on the original domain, ``f(x) -> float``.
-        suite: Suite name, used only for the IOH registry name.
-        name: Problem name stored in IOH meta data.
-        function_id: Function number stored in IOH meta data.
-        dimension: Number of variables.
-        lb: Lower bound(s) of the original domain.
-        ub: Upper bound(s) of the original domain.
-        instance: Instance number stored in IOH meta data.
-        optimum: Known global optimum ``(x, f)`` of the wrapped problem, with
-            ``x`` in original coordinates and ``f`` including ``objective_offset``.
-        transform: Variable transformation applied in original coordinates,
-            after the mapping from [0, 1]^d and before ``function``.
-        objective_offset: Constant added to every objective value.
+    A plain picklable object (rather than a closure) so that problems can be
+    sent to parallel workers.
     """
+
+    base: Callable[[np.ndarray], np.ndarray]
+    lb: np.ndarray
+    ub: np.ndarray
+    rotation: np.ndarray | None = None
+    shift: np.ndarray | None = None
+    x_opt: np.ndarray | None = None
+    offset: float = 0.0
+
+    def __call__(self, u: np.ndarray) -> np.ndarray:
+        x = from_unit(u, self.lb, self.ub)
+        if self.rotation is not None:
+            x = (x - self.shift) @ self.rotation.T + self.x_opt
+        return np.asarray(self.base(x), dtype=float) + self.offset
+
+
+class _IOHFunction:
+    """Vectorized view of an IOH problem that survives pickling.
+
+    IOH problems cannot be pickled; the problem is rebuilt from ``factory`` on
+    first use after unpickling.
+    """
+
+    def __init__(self, problem: Any, factory: Callable[[], Any]) -> None:
+        self._problem = problem
+        self._factory = factory
+
+    def __call__(self, x: np.ndarray) -> np.ndarray:
+        if self._problem is None:
+            self._problem = self._factory()
+        return np.asarray(self._problem(x), dtype=float)
+
+    def __getstate__(self) -> dict[str, Any]:
+        return {"_problem": None, "_factory": self._factory}
+
+
+def _create_ioh(cls: type, function: int, instance: int, dimension: int) -> Any:
+    # Module-level so that the default factory is picklable; pybind methods are not.
+    return cls.create(function, instance, dimension)
+
+
+def _box(dimension: int, lb: ArrayLike, ub: ArrayLike) -> tuple[np.ndarray, np.ndarray]:
     lb = np.broadcast_to(np.asarray(lb, dtype=float), (dimension,)).copy()
     ub = np.broadcast_to(np.asarray(ub, dtype=float), (dimension,)).copy()
     if np.any(ub <= lb):
         raise ValueError("Upper bounds must be strictly greater than lower bounds")
-
-    def transform_variables(u: np.ndarray, _instance: int) -> np.ndarray:
-        x = from_unit(u, lb, ub)
-        return x if transform is None else transform(x)
-
-    transform_objectives = None
-    if objective_offset != 0.0:
-
-        def transform_objectives(y: float, _instance: int) -> float:
-            return y + objective_offset
-
-    calculate_objective = None
-    if optimum is not None:
-        x_opt = to_unit(optimum[0], lb, ub)
-        f_opt = float(optimum[1])
-
-        def calculate_objective(_instance: int, _dimension: int) -> tuple[np.ndarray, float]:
-            return x_opt, f_opt
-
-    problem = ioh.wrap_problem(
-        function,
-        name=_registry_name(suite, name, function_id, instance, dimension),
-        dimension=dimension,
-        instance=instance,
-        lb=0.0,
-        ub=1.0,
-        transform_variables=transform_variables,
-        transform_objectives=transform_objectives,
-        calculate_objective=calculate_objective,
-    )
-    _keep_alive(problem, function, transform_variables, transform_objectives, calculate_objective)
-    problem.set_id(function_id)
-    problem.set_name(name)
-    return problem
+    return lb, ub
 
 
-def normalize(problem: Problem, suite: str) -> Problem:
-    """Return ``problem`` seen on [0, 1]^d.
+def from_function(
+    function: Callable[[np.ndarray], np.ndarray],
+    *,
+    id: ProblemId,
+    lb: ArrayLike,
+    ub: ArrayLike,
+    name: str = "",
+    optimum: tuple[ArrayLike, float] | None = None,
+) -> Problem:
+    """Create a problem from a vectorized function defined on the box [lb, ub].
 
-    Problems already defined on [0, 1]^d are returned unchanged. Other problems
-    (e.g. native BBOB on [-5, 5]^d) get a thin IOH wrapper; the wrapper keeps the
-    function id, instance and name of the original problem, and counts its own
-    evaluations in ``state.evaluations``.
+    Args:
+        function: Objective on the original domain, ``(n, d) -> (n,)``.
+        id: Problem identifier.
+        lb: Lower bound(s) of the original domain.
+        ub: Upper bound(s) of the original domain.
+        name: Human-readable name.
+        optimum: Known global optimum ``(x, f)`` with ``x`` in original coordinates.
     """
-    lb, ub = problem.bounds.lb, problem.bounds.ub
-    if np.all(lb == 0.0) and np.all(ub == 1.0):
-        return problem
+    lb, ub = _box(id.dimension, lb, ub)
+    if optimum is not None:
+        optimum = (to_unit(optimum[0], lb, ub), float(optimum[1]))
+    return Problem(id=id, function=_BoxFunction(function, lb, ub), name=name, optimum=optimum)
 
+
+def from_ioh(
+    problem: Any,
+    suite: str,
+    factory: Callable[[], Any] | None = None,
+) -> Problem:
+    """Adapt an IOH real-valued single-objective problem.
+
+    The id, name, bounds and optimum are read from the IOH problem. Evaluations
+    are counted by the returned :class:`Problem`, not by IOH's ``state``.
+
+    Args:
+        problem: IOH problem, e.g. from ``ioh.get_problem``.
+        suite: Suite name stored in the :class:`ProblemId`.
+        factory: Rebuilds the IOH problem after unpickling. Defaults to
+            ``type(problem).create(function, instance, dimension)``, which works
+            for native IOH problems such as BBOB.
+    """
     meta = problem.meta_data
+    id = ProblemId(suite, meta.problem_id, meta.instance, meta.n_variables)
+    if factory is None:
+        factory = functools.partial(
+            _create_ioh, type(problem), id.function, id.instance, id.dimension
+        )
+
     optimum = None
     if np.all(np.isfinite(problem.optimum.x)) and np.isfinite(problem.optimum.y):
         optimum = (np.asarray(problem.optimum.x), problem.optimum.y)
 
-    return wrap(
-        problem,
-        suite=suite,
+    return from_function(
+        _IOHFunction(problem, factory),
+        id=id,
+        lb=problem.bounds.lb,
+        ub=problem.bounds.ub,
         name=meta.name,
-        function_id=meta.problem_id,
-        dimension=meta.n_variables,
-        lb=lb,
-        ub=ub,
-        instance=meta.instance,
         optimum=optimum,
     )
 
@@ -223,16 +242,13 @@ def _bbob_offset(rng: np.random.Generator) -> float:
 
 
 def make_instance(
-    function: Callable[[np.ndarray], float],
+    function: Callable[[np.ndarray], np.ndarray],
     *,
-    suite: str,
-    name: str,
-    function_id: int,
-    dimension: int,
-    instance: int,
+    id: ProblemId,
     lb: ArrayLike,
     ub: ArrayLike,
     x_opt: ArrayLike,
+    name: str = "",
     seed: int = 0,
     shift: bool = True,
     rotate: bool = True,
@@ -248,43 +264,30 @@ def make_instance(
     - ``R`` (rotation) is a uniformly random orthogonal matrix,
     - ``f*`` (offset) follows the BBOB distribution.
 
-    The random state is derived from ``(seed, function_id, instance, dimension)``,
-    so instances are reproducible and independent of creation order.
+    The random state is derived from ``(seed, function, instance, dimension)`` of
+    ``id``, so instances are reproducible and independent of creation order.
 
     Rotation maps parts of the domain outside the original box, so ``f`` must
     be defined there and ``x_opt`` must remain its global minimizer.
     """
-    lb = np.broadcast_to(np.asarray(lb, dtype=float), (dimension,)).copy()
-    ub = np.broadcast_to(np.asarray(ub, dtype=float), (dimension,)).copy()
+    lb, ub = _box(id.dimension, lb, ub)
     x_opt = np.asarray(x_opt, dtype=float)
-    if x_opt.shape != (dimension,):
-        raise ValueError(f"x_opt must have shape ({dimension},), got {x_opt.shape}")
+    if x_opt.shape != (id.dimension,):
+        raise ValueError(f"x_opt must have shape ({id.dimension},), got {x_opt.shape}")
     if np.any(x_opt < lb) or np.any(x_opt > ub):
         raise ValueError("x_opt must lie inside [lb, ub]")
 
-    seed_seq = np.random.SeedSequence(seed, spawn_key=(function_id, instance, dimension))
+    seed_seq = np.random.SeedSequence(seed, spawn_key=(id.function, id.instance, id.dimension))
     rng = np.random.default_rng(seed_seq)
     margin = 0.1 * (ub - lb)
-    x_star = rng.uniform(lb + margin, ub - margin) if shift else x_opt.copy()
-    rotation = _random_rotation(rng, dimension) if rotate else np.eye(dimension)
+    x_star = rng.uniform(lb + margin, ub - margin) if shift else x_opt
+    rotation = _random_rotation(rng, id.dimension) if rotate else np.eye(id.dimension)
     f_star = _bbob_offset(rng) if offset else 0.0
 
-    if np.any(x_star < lb) or np.any(x_star > ub):
-        raise RuntimeError("Shifted optimum left the domain")
-
-    def transform(x: np.ndarray) -> np.ndarray:
-        return rotation @ (x - x_star) + x_opt
-
-    return wrap(
-        function,
-        suite=suite,
+    f_opt = float(np.asarray(function(x_opt[None, :]))[0]) + f_star
+    return Problem(
+        id=id,
+        function=_BoxFunction(function, lb, ub, rotation, x_star, x_opt, f_star),
         name=name,
-        function_id=function_id,
-        dimension=dimension,
-        lb=lb,
-        ub=ub,
-        instance=instance,
-        optimum=(x_star, float(function(x_opt)) + f_star),
-        transform=transform,
-        objective_offset=f_star,
+        optimum=(to_unit(x_star, lb, ub), f_opt),
     )
