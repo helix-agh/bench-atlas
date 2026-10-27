@@ -19,6 +19,12 @@ uv run bench-atlas --help
 
 Planned subcommands: `ela`, `lon`, `timing`, `run`, `metrics`, `report`.
 
+## Problems
+
+All benchmark problems are [IOH](https://github.com/IOHprofiler/IOHexperimenter)
+problems, analysed on [0, 1]^d (see `bench_atlas.problems`). Every place where we
+deviate from plain IOH is listed in [docs/ioh-deviations.md](docs/ioh-deviations.md).
+
 ## Development
 
 ```bash
