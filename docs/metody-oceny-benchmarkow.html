@@ -1,0 +1,485 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Metody oceny benchmarków</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: notatka techniczna; lewy spis treści przyklejony na desktopie, jedna kolumna na telefonie. */
+:root {
+  --bg: #f5f6f7;
+  --surface: #ffffff;
+  --ink: #16202b;
+  --muted: #5a6573;
+  --rule: #d5dae0;
+  --accent: #1d4ed8;
+  --accent-soft: #e3ebfd;
+  --bbob: #8a94a3;
+  --cand: #1d4ed8;
+  --warm: #c2410c;
+  --warm-soft: #fbeadf;
+  --display: "IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", Menlo, Consolas, monospace;
+  --math: "STIX Two Math", "Cambria Math", "Latin Modern Math", math, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161b; --surface: #1a2027; --ink: #e6e9ed; --muted: #9aa4b1; --rule: #2e3742;
+    --accent: #7ea2f7; --accent-soft: #1d2a45; --bbob: #7b8594; --cand: #7ea2f7;
+    --warm: #f0915a; --warm-soft: #3a2519; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161b; --surface: #1a2027; --ink: #e6e9ed; --muted: #9aa4b1; --rule: #2e3742;
+  --accent: #7ea2f7; --accent-soft: #1d2a45; --bbob: #7b8594; --cand: #7ea2f7;
+  --warm: #f0915a; --warm-soft: #3a2519; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--body); font-size: 16px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 64px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 48px; }
+nav.toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-top: 48px; font-size: 14px; }
+nav.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+nav.toc a { color: var(--muted); text-decoration: none; display: grid; grid-template-columns: 2.2em 1fr; }
+nav.toc a:hover, nav.toc a:focus-visible { color: var(--accent); }
+nav.toc .n { font-family: var(--mono); font-size: 12px; padding-top: 2px; }
+main { min-width: 0; padding-top: 48px; }
+header.top { border-bottom: 2px solid var(--ink); padding-bottom: 24px; margin-bottom: 8px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.12; margin: 0; }
+h1 { font-size: clamp(32px, 5vw, 48px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 28px; font-weight: 700; display: flex; gap: 14px; align-items: baseline; }
+h2 .n { font-family: var(--mono); font-size: 15px; font-weight: 500; color: var(--accent); }
+h3 { font-size: 19px; font-weight: 600; margin-top: 8px; }
+.lead { font-size: 18px; max-width: 64ch; margin: 14px 0 0; }
+section { padding-block: 36px 8px; border-bottom: 1px solid var(--rule); display: grid; gap: 14px; }
+section:last-of-type { border-bottom: 0; }
+section > p, section > ul, section > ol { max-width: 68ch; margin: 0; }
+ul, ol { padding-left: 1.2em; }
+li { margin-bottom: 4px; }
+code, .mono { font-family: var(--mono); font-size: .88em; }
+code { background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+a { color: var(--accent); }
+
+.formula {
+  background: var(--surface); border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+  padding: 16px 20px 14px; max-width: 72ch; display: grid; gap: 10px;
+}
+.formula .eq { overflow-x: auto; overflow-y: hidden; padding-block: 4px; }
+.formula math { font-family: var(--math); font-size: 1.22em; color: var(--ink); }
+.formula .c { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0; }
+.formula .c math { font-size: 1.05em; }
+p math, li math, td math { font-family: var(--math); font-size: 1.08em; }
+
+.caution { background: var(--warm-soft); border-radius: 4px; padding: 14px 18px; max-width: 72ch; }
+.caution b.lbl { font-family: var(--mono); font-size: 12px; letter-spacing: .05em; text-transform: uppercase; color: var(--warm); display: block; margin-bottom: 4px; font-weight: 500; }
+.caution p { margin: 0; }
+.tbl { overflow-x: auto; max-width: 100%; }
+table { border-collapse: collapse; font-size: 14px; width: 100%; background: var(--surface); }
+table.wide { min-width: 640px; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+th { font-family: var(--mono); font-size: 12px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid var(--ink); }
+td:first-child { font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; font-family: var(--mono); font-size: 11px; padding: 1px 8px; border-radius: 99px; border: 1px solid currentColor; white-space: nowrap; }
+.pill.head { color: var(--accent); }
+.pill.diag { color: var(--muted); }
+figure { margin: 0; max-width: 100%; }
+figure .svgbox { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); padding: 12px; }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; max-width: 72ch; }
+svg text { font-family: var(--mono); fill: var(--ink); }
+svg .mut { fill: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.cardlet { background: var(--surface); border: 1px solid var(--rule); padding: 14px 16px; border-radius: 4px; min-width: 0; }
+.cardlet h3 { margin: 0 0 6px; font-size: 17px; }
+.cardlet p { margin: 0; font-size: 15px; }
+.cardlet .tag { font-family: var(--mono); font-size: 11px; color: var(--muted); display: block; margin-bottom: 4px; }
+@media (max-width: 860px) {
+  .wrap { grid-template-columns: 1fr; gap: 0; }
+  nav.toc { position: static; padding-top: 24px; }
+  nav.toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main { padding-top: 24px; }
+  .grid2 { grid-template-columns: 1fr; }
+}
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<div class="wrap">
+<nav class="toc" aria-label="Spis treści">
+  <ol>
+    <li><a href="#protokol"><span class="n">00</span>Wspólny protokół</a></li>
+    <li><a href="#ela"><span class="n">01</span>Cechy ELA</a></li>
+    <li><a href="#lon"><span class="n">02</span>LON i trudność</a></li>
+    <li><a href="#pokrycie"><span class="n">03</span>UMAP i różnorodność</a></li>
+    <li><a href="#czas"><span class="n">04</span>Czas</a></li>
+    <li><a href="#roznicowanie"><span class="n">05</span>Różnicowanie</a></li>
+    <li><a href="#karta"><span class="n">06</span>Karta porównania</a></li>
+    <li><a href="#decyzje"><span class="n">07</span>Do decyzji</a></li>
+  </ol>
+</nav>
+
+<main>
+<header class="top">
+  <p class="eyebrow">real-world-bench · faza 2 · szkic metodologii · 27.10.2026</p>
+  <h1>Metody oceny i porównywania benchmarków</h1>
+  <p class="lead">Pięć analiz, które porównują całe zestawy problemów ze sobą: BBOB, CEC&nbsp;2017, MA-BBOB, GNBG-III i nasze problemy rzeczywiste.</p>
+</header>
+
+<section id="protokol">
+  <h2><span class="n">00</span>Wspólny protokół</h2>
+  <p>Wszystkie metryki porównują zbiory punktów. Porównanie ma sens tylko wtedy, gdy każdy benchmark przechodzi przez identyczny pomiar.</p>
+  <figure>
+    <div class="svgbox">
+      <svg viewBox="0 0 860 210" width="100%" style="min-width:640px" role="img" aria-label="Przepływ: problemy, cztery pomiary, wyniki dla każdego problemu, metryki dla całego benchmarku">
+        <g font-size="12">
+          <rect x="10" y="70" width="140" height="70" rx="4" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.5"/>
+          <text x="80" y="98" text-anchor="middle" font-weight="500">problem p</text>
+          <text x="80" y="118" text-anchor="middle" class="mut" font-size="11">benchmark × f × d</text>
+          <g>
+            <rect x="200" y="10" width="190" height="38" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="295" y="34" text-anchor="middle">ELA · orivex</text>
+            <rect x="200" y="60" width="190" height="38" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="295" y="84" text-anchor="middle">LON · lonkit</text>
+            <rect x="200" y="110" width="190" height="38" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="295" y="134" text-anchor="middle">czas ewaluacji</text>
+            <rect x="200" y="160" width="190" height="38" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"/>
+            <text x="295" y="184" text-anchor="middle">portfolio · AOCC</text>
+          </g>
+          <g stroke="var(--muted)" fill="none" stroke-width="1.2">
+            <path d="M150 105 C175 105 175 29 200 29"/><path d="M150 105 C175 105 175 79 200 79"/>
+            <path d="M150 105 C175 105 175 129 200 129"/><path d="M150 105 C175 105 175 179 200 179"/>
+            <path d="M390 29 H440"/><path d="M390 79 H440"/><path d="M390 129 H440"/><path d="M390 179 H440"/>
+            <path d="M610 29 H660"/><path d="M610 79 H660"/><path d="M610 129 H660"/><path d="M610 179 H660"/>
+          </g>
+          <text x="525" y="34" text-anchor="middle">wektor cech ELA</text>
+          <text x="525" y="84" text-anchor="middle">wektor cech LON</text>
+          <text x="525" y="134" text-anchor="middle">t_eval(p, d)</text>
+          <text x="525" y="184" text-anchor="middle">macierz AOCC</text>
+          <text x="760" y="34" text-anchor="middle" font-weight="500">C@24 · VS@24 · N</text>
+          <text x="760" y="84" text-anchor="middle" font-weight="500">C@24 · VS@24 · N</text>
+          <text x="760" y="134" text-anchor="middle" font-weight="500">czas wzgl. BBOB</text>
+          <text x="760" y="184" text-anchor="middle" font-weight="500">G@24 · S · 1−W</text>
+          <text x="525" y="8" text-anchor="middle" class="mut" font-size="10">na problem</text>
+          <text x="760" y="8" text-anchor="middle" class="mut" font-size="10">na benchmark</text>
+        </g>
+      </svg>
+    </div>
+  </figure>
+  <ul>
+    <li><b>Jednostka analizy:</b> problem <i>p</i> = (benchmark, funkcja, <i>d</i>). Instancje i seedy agregujemy medianą; ich rozrzut raportujemy osobno jako stabilność.</li>
+    <li><b>Wymiarowości:</b> <i>d</i> ∈ {2, 5, 10, 20}. Wszystkie metryki liczymy osobno dla każdego <i>d</i>. Cechy ELA zależą od <i>d</i>, więc mieszanie wymiarowości w jednej chmurze mierzyłoby głównie <i>d</i>.</li>
+    <li><b>Instancje:</b> 5 na funkcję. Problemy bez naturalnych instancji dostają transformacje w stylu BBOB (przesunięcie, rotacja, przesunięcie f), o ile optimum zostaje w dziedzinie.</li>
+    <li><b>Normalizacja wejścia:</b> dziedzinę skalujemy do [0, 1]<sup><i>d</i></sup> przed każdą analizą. Bez tego porównujemy jednostki fizyczne, a nie krajobrazy.</li>
+  </ul>
+</section>
+
+<section id="ela">
+  <h2><span class="n">01</span>Cechy ELA w orivex</h2>
+  <h3>Protokół</h3>
+  <ul>
+    <li><b>Normalizacja f:</b> min-max w orivex.</li>
+    <li><b>Grupy cech:</b> tylko cechy liczone z samej próby: <code>distribution</code>, <code>meta_model</code>, <code>nearest_better</code>, <code>information_content</code>, <code>fitness_distance</code> (odległość do najlepszego punktu próby, nie do prawdziwego optimum). Pomijamy cechy wymagające dodatkowych ewaluacji, bo dla drogich problemów koszt przestaje być porównywalny.</li>
+    <li><b>Powtórzenia:</b> 10 seedów próby × 5 instancji, mediana na problem.</li>
+  </ul>
+</section>
+
+<section id="lon">
+  <h2><span class="n">02</span>LON w lonkit i cechy trudności</h2>
+  <h3>Protokół</h3>
+  <ul>
+    <li><b>Sampler:</b> <code>BasinHoppingSampler</code> z L-BFGS-B i tym samym rozmiarem kroku dla wszystkich problemów, bo dziedzina to zawsze [0, 1]<sup><i>d</i></sup>.</li>
+    <li><b>Sieć:</b> CMLON.</li>
+    <li><b>Limit ewaluacji:</b> domyślne 100 przebiegów × 250 perturbacji bez poprawy to bardzo dużo wywołań f dla drogiego problemu. Liczymy wywołania i ustalamy wspólny limit. Wymiarowości dla LON: {2, 5, 10}.</li>
+  </ul>
+  <h3>Cechy, które mówią o trudności</h3>
+  <div class="tbl">
+  <table>
+    <thead><tr><th>cecha (lonkit)</th><th>kierunek</th></tr></thead>
+    <tbody>
+      <tr><td><code>global_strength</code></td><td>niżej = trudniej</td></tr>
+      <tr><td><code>sink_strength</code></td><td>niżej = trudniej</td></tr>
+      <tr><td><code>global_funnel_proportion</code></td><td>niżej = trudniej</td></tr>
+      <tr><td><code>n_funnels</code> (log)</td><td>wyżej = trudniej</td></tr>
+      <tr><td><code>success</code>, <code>deviation</code></td><td><code>success</code> niżej = trudniej</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <h3>Galeria LON</h3>
+  <p>Siatka grafów CMLON, jeden na funkcję (<code>plot_2d</code> z lonkit). Wiersze to benchmarki, a w wierszu funkcje są posortowane po <code>global_strength</code>. Pod każdym grafem <code>n_funnels</code> i <code>global_strength</code>.</p>
+</section>
+
+<section id="pokrycie">
+  <h2><span class="n">03</span>UMAP i różnorodność</h2>
+  <h3>UMAP</h3>
+  <p>Scatter plot UMAP 2D pokazuje, gdzie leżą benchmarki: dopasowany raz na wszystkich porównywanych problemach, kolor = benchmark, z ustalonym <code>random_state</code>. Osobno dla cech ELA i cech LON.</p>
+
+  <h3>Metryki różnorodności</h3>
+  <div class="grid2">
+    <div class="cardlet">
+      <span class="tag">jak szeroko</span>
+      <h3>Pokrycie C@24</h3>
+      <p>Jaką część wspólnej puli problemów benchmark „obsługuje” w promieniu ε.</p>
+    </div>
+    <div class="cardlet">
+      <span class="tag">jak różnorodnie</span>
+      <h3>Vendi score VS@24</h3>
+      <p>Efektywna liczba naprawdę różnych problemów w benchmarku.</p>
+    </div>
+    <div class="cardlet">
+      <span class="tag">poza BBOB</span>
+      <h3>Nowość N</h3>
+      <p>Jaka część problemów leży dalej niż ε od każdej funkcji BBOB.</p>
+    </div>
+    <div class="cardlet">
+      <span class="tag">kontrola</span>
+      <h3>Druga przestrzeń</h3>
+      <p>Każdą liczbę podajemy w ELA i w LON. Wniosek przyjmujemy, jeśli zgadza się w obu.</p>
+    </div>
+  </div>
+
+  <div class="caution">
+    <b class="lbl">Dlaczego @24</b>
+    <p>Pokrycie i VS rosną z liczbą problemów, więc liczymy je na losowych podzbiorach po 24 problemy (rozmiar BBOB) i uśredniamy.</p>
+  </div>
+
+  <div class="formula">
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <msub><mi>C</mi><mi>ε</mi></msub><mo>(</mo><mi>B</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>1</mn><mrow><mo>|</mo><mi>R</mi><mo>|</mo></mrow></mfrac>
+          <munder><mo>∑</mo><mrow><mi>r</mi><mo>∈</mo><mi>R</mi></mrow></munder>
+          <mn>𝟙</mn><mo>[</mo>
+          <munder><mi>min</mi><mrow><mi>b</mi><mo>∈</mo><mi>B</mi></mrow></munder>
+          <mo>‖</mo><mi>r</mi><mo>−</mo><mi>b</mi><mo>‖</mo><mo>≤</mo><mi>ε</mi>
+          <mo>]</mo>
+        </mrow>
+      </math>
+    </div>
+    <p class="c"><i>R</i> = wszystkie porównywane problemy przy danym <i>d</i>. ε = mediana odległości do 5. najbliższego sąsiada w <i>R</i>.</p>
+  </div>
+
+  <figure>
+    <div class="svgbox">
+      <svg viewBox="0 0 640 230" width="100%" style="min-width:460px" role="img" aria-label="Ilustracja pokrycia: punkty puli, punkty benchmarku i kule o promieniu epsilon">
+        <rect x="10" y="10" width="420" height="210" fill="none" stroke="var(--rule)"/>
+        <g fill="var(--cand)" fill-opacity="0.10" stroke="var(--cand)" stroke-opacity="0.6">
+          <circle cx="95" cy="70" r="34"/><circle cx="150" cy="140" r="34"/><circle cx="260" cy="60" r="34"/>
+          <circle cx="330" cy="160" r="34"/>
+        </g>
+        <g fill="var(--bbob)">
+          <circle cx="40" cy="40" r="3.5"/><circle cx="80" cy="85" r="3.5"/><circle cx="110" cy="55" r="3.5"/>
+          <circle cx="60" cy="150" r="3.5"/><circle cx="135" cy="160" r="3.5"/><circle cx="170" cy="120" r="3.5"/>
+          <circle cx="200" cy="190" r="3.5"/><circle cx="215" cy="95" r="3.5"/><circle cx="245" cy="40" r="3.5"/>
+          <circle cx="285" cy="75" r="3.5"/><circle cx="300" cy="120" r="3.5"/><circle cx="350" cy="140" r="3.5"/>
+          <circle cx="320" cy="185" r="3.5"/><circle cx="380" cy="60" r="3.5"/><circle cx="400" cy="195" r="3.5"/>
+          <circle cx="385" cy="110" r="3.5"/><circle cx="30" cy="200" r="3.5"/><circle cx="160" cy="30" r="3.5"/>
+        </g>
+        <g fill="var(--cand)">
+          <rect x="91" y="66" width="8" height="8"/><rect x="146" y="136" width="8" height="8"/>
+          <rect x="256" y="56" width="8" height="8"/><rect x="326" y="156" width="8" height="8"/>
+        </g>
+        <g font-size="12">
+          <circle cx="460" cy="40" r="4" fill="var(--bbob)"/><text x="474" y="44">problem z puli R</text>
+          <rect x="456" y="66" width="8" height="8" fill="var(--cand)"/><text x="474" y="74">problem benchmarku B</text>
+          <circle cx="460" cy="102" r="12" fill="var(--cand)" fill-opacity="0.10" stroke="var(--cand)"/><text x="480" y="106">kula o promieniu ε</text>
+          <text x="452" y="150" class="mut" font-size="11">pokryte: 8 z 18 punktów R</text>
+          <text x="452" y="170" class="mut" font-size="11">C = 8/18 ≈ 0,44</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Ilustracja pokrycia na rysunkowym przykładzie 2D. W praktyce liczymy w pełnej, standaryzowanej przestrzeni cech.</figcaption>
+  </figure>
+
+  <div class="formula">
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>VS</mi><mo>(</mo><mi>B</mi><mo>)</mo><mo>=</mo>
+          <mi>exp</mi><mo>(</mo><mo>−</mo>
+          <munder><mo>∑</mo><mi>i</mi></munder>
+          <msub><mi>λ</mi><mi>i</mi></msub><mspace width="0.2em"/><mi>log</mi><mspace width="0.15em"/><msub><mi>λ</mi><mi>i</mi></msub>
+          <mo>)</mo>
+          <mspace width="1.2em"/>
+          <msub><mi>K</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo>
+          <mi>exp</mi><mo>(</mo><mo>−</mo>
+          <mfrac>
+            <msup><mrow><mo>‖</mo><msub><mi>b</mi><mi>i</mi></msub><mo>−</mo><msub><mi>b</mi><mi>j</mi></msub><mo>‖</mo></mrow><mn>2</mn></msup>
+            <mrow><mn>2</mn><msup><mi>h</mi><mn>2</mn></msup></mrow>
+          </mfrac>
+          <mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p class="c">Vendi score: λ<sub><i>i</i></sub> to wartości własne <i>K</i>/<i>n</i>. VS = 1, gdy wszystkie problemy są identyczne, VS = <i>n</i>, gdy wszystkie są daleko od siebie. <i>h</i> = mediana odległości między problemami.</p>
+  </div>
+
+  <div class="formula">
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>N</mi><mo>(</mo><mi>B</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>1</mn><mrow><mo>|</mo><mi>B</mi><mo>|</mo></mrow></mfrac>
+          <munder><mo>∑</mo><mrow><mi>p</mi><mo>∈</mo><mi>B</mi></mrow></munder>
+          <mn>𝟙</mn><mo>[</mo>
+          <munder><mi>min</mi><mrow><mi>q</mi><mo>∈</mo><mtext>BBOB</mtext></mrow></munder>
+          <mo>‖</mo><mi>p</mi><mo>−</mo><mi>q</mi><mo>‖</mo><mo>&gt;</mo><mi>ε</mi>
+          <mo>]</mo>
+        </mrow>
+      </math>
+    </div>
+    <p class="c">Odsetek problemów spoza otoczenia BBOB. Dla każdego problemu raportujemy też samą odległość do najbliższej funkcji BBOB.</p>
+  </div>
+</section>
+
+<section id="czas">
+  <h2><span class="n">04</span>Czas</h2>
+  <ul>
+    <li>Dla każdego problemu i <i>d</i> mierzymy medianę czasu jednej ewaluacji w 1000 losowych punktach, na jednym wątku i tej samej maszynie.</li>
+    <li>Benchmarki porównujemy przez czas policzenia całego protokołu z sekcji 05 w stosunku do BBOB.</li>
+  </ul>
+</section>
+
+<section id="roznicowanie">
+  <h2><span class="n">05</span>Zdolność do różnicowania algorytmów</h2>
+  <p>AOCC (pole nad krzywą zbieżności) przy budżecie 1000·<i>d</i> daje jedną liczbę z [0, 1] na przebieg i uwzględnia całą trajektorię, a nie tylko wynik końcowy. Z tych samych przebiegów od razu mamy AOCC dla krótszych budżetów (100·<i>d</i>, 300·<i>d</i>), czyli zmianę rankingu z budżetem, bez dodatkowych obliczeń.</p>
+  <p>Standardowe AOCC zakłada, że znamy <i>f</i>* i że błąd mieści się w [10⁻⁸, 10²]. Na problemach rzeczywistych skale f różnią się o rzędy wielkości, a optimum często nie znamy. Dlatego błąd normalizujemy względem typowej wartości losowego punktu:</p>
+  <div class="formula">
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>e</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>=</mo>
+          <mfrac>
+            <mrow><msub><mi>f</mi><mtext>best</mtext></msub><mo>(</mo><mi>t</mi><mo>)</mo><mo>−</mo><msup><mi>f</mi><mo>*</mo></msup></mrow>
+            <mrow><msub><mi>f</mi><mtext>med</mtext></msub><mo>−</mo><msup><mi>f</mi><mo>*</mo></msup></mrow>
+          </mfrac>
+        </mrow>
+      </math>
+    </div>
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mtext>AOCC</mtext><mo>=</mo>
+          <mfrac><mn>1</mn><msub><mi>t</mi><mtext>max</mtext></msub></mfrac>
+          <munderover><mo>∑</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><msub><mi>t</mi><mtext>max</mtext></msub></munderover>
+          <mrow><mo>[</mo><mn>1</mn><mo>−</mo>
+          <mtext>clip</mtext><mo>(</mo>
+          <mfrac><mrow><msub><mi>log</mi><mn>10</mn></msub><mspace width="0.15em"/><mi>e</mi><mo>(</mo><mi>t</mi><mo>)</mo><mo>+</mo><mn>8</mn></mrow><mn>8</mn></mfrac>
+          <mo>,</mo><mn>0</mn><mo>,</mo><mn>1</mn><mo>)</mo>
+          <mo>]</mo></mrow>
+          <mo>,</mo><mspace width="1em"/>
+          <msub><mi>t</mi><mtext>max</mtext></msub><mo>=</mo><mn>1000</mn><mi>d</mi>
+        </mrow>
+      </math>
+    </div>
+    <p class="c"><i>f</i>* = znane optimum albo najlepsza wartość ze wszystkich przebiegów całego portfolio. <i>f</i><sub>med</sub> = mediana f na próbie z sekcji 01. AOCC = 0 oznacza „nie lepiej niż typowy losowy punkt”, AOCC = 1 oznacza osiągnięcie 10⁻⁸ od razu. Ta sama definicja obowiązuje dla BBOB, więc liczby BBOB będą trochę inne niż w literaturze.</p>
+  </div>
+  <ul>
+    <li><b>Portfolio:</b> stałe, z różnych klas metod, wersjonowane: CMA-ES (IPOP), DE (np. L-SHADE), PSO, Nelder–Mead z restartami, L-BFGS-B z restartami, (1+1)-ES, losowe przeszukiwanie. Każda metryka różnicowania zależy od portfolio. Gdyby w portfolio były same warianty DE, każdy benchmark wyglądałby na słabo różnicujący.</li>
+    <li><b>Przebiegi:</b> 5 instancji × 5 seedów = 25 przebiegów na (problem, <i>d</i>, algorytm).</li>
+  </ul>
+
+  <h3>Metryka benchmarku: różnica VBS − SBS</h3>
+  <p>Benchmark ma niską wartość, gdy wszystkie funkcje dają ten sam ranking. Najprostsza liczba, która to mierzy, to zysk z wyboru algorytmu dla każdego problemu osobno w porównaniu z jednym algorytmem dla wszystkich:</p>
+  <div class="formula">
+    <div class="eq">
+      <math display="block">
+        <mrow>
+          <mi>G</mi><mo>(</mo><mi>B</mi><mo>)</mo><mo>=</mo>
+          <mfrac><mn>1</mn><mrow><mo>|</mo><mi>B</mi><mo>|</mo></mrow></mfrac>
+          <munder><mo>∑</mo><mrow><mi>p</mi><mo>∈</mo><mi>B</mi></mrow></munder>
+          <munder><mi>max</mi><mi>a</mi></munder><mspace width="0.15em"/>
+          <mtext>AOCC</mtext><mo>(</mo><mi>a</mi><mo>,</mo><mi>p</mi><mo>)</mo>
+          <mo>−</mo>
+          <munder><mi>max</mi><mi>a</mi></munder><mspace width="0.15em"/>
+          <mfrac><mn>1</mn><mrow><mo>|</mo><mi>B</mi><mo>|</mo></mrow></mfrac>
+          <munder><mo>∑</mo><mrow><mi>p</mi><mo>∈</mo><mi>B</mi></mrow></munder>
+          <mtext>AOCC</mtext><mo>(</mo><mi>a</mi><mo>,</mo><mi>p</mi><mo>)</mo>
+        </mrow>
+      </math>
+    </div>
+    <p class="c">Pierwszy człon to virtual best solver (VBS), drugi to single best solver (SBS). G = 0, gdy jeden algorytm wygrywa wszędzie albo gdy algorytmy się nie różnią. G jest duże tylko wtedy, gdy problemy rozróżniają algorytmy <i>i</i> różne problemy nagradzają różne algorytmy.</p>
+  </div>
+  <p>Dlaczego G, a nie sam ranking: łączy w jednej liczbie oba warunki i jest wyrażone w jednostkach AOCC, więc da się je zinterpretować („wybierając algorytm per problem zyskujemy 0,12 AOCC”).</p>
+
+  <h3>Dwie metryki diagnostyczne</h3>
+  <p>G mówi, ile benchmark różnicuje. Te dwie mówią, dlaczego:</p>
+  <div class="tbl">
+  <table class="wide">
+    <thead><tr><th>metryka</th><th>definicja</th><th>pytanie</th><th>rola</th></tr></thead>
+    <tbody>
+      <tr><td>G@24</td><td>różnica AOCC między VBS a SBS</td><td>Ile daje dobór algorytmu do problemu?</td><td><span class="pill head">główna</span></td></tr>
+      <tr><td>Separowalność S</td><td>Średni po problemach odsetek par algorytmów różnych istotnie (Mann–Whitney, korekta Holma) i z dużym efektem (|A₁₂ − 0,5| ≥ 0,21, Vargha–Delaney)</td><td>Czy pojedynczy problem w ogóle rozróżnia algorytmy?</td><td><span class="pill diag">diagnostyka</span></td></tr>
+      <tr><td>Różnorodność rankingów 1 − W</td><td>W = współczynnik zgodności Kendalla rankingów algorytmów między problemami</td><td>Czy problemy preferują różne algorytmy?</td><td><span class="pill diag">diagnostyka</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Stabilność dla budżetu i wymiarowości liczymy jako τ Kendalla między rankingami przy AOCC@100<i>d</i> i AOCC@1000<i>d</i> oraz między kolejnymi <i>d</i>. To przechodzi do karty problemu, a nie do porównania benchmarków.</p>
+
+  <h3>Przestrzeń wyników jako lustro przestrzeni cech</h3>
+  <p>Wektor median AOCC wszystkich algorytmów to opis problemu w przestrzeni wyników. Na nim można policzyć te same VS@24 i nowość N co w sekcji 03. Wtedy każdy problem dostaje dwie liczby nowości względem BBOB i można go umieścić na jednym wykresie:</p>
+  <figure>
+    <div class="svgbox">
+      <svg viewBox="0 0 560 300" width="100%" style="min-width:420px" role="img" aria-label="Wykres ćwiartek: nowość krajobrazu względem BBOB na osi poziomej, nowość wyników na osi pionowej">
+        <rect x="300" y="20" width="230" height="120" fill="var(--accent-soft)"/>
+        <line x1="70" y1="260" x2="530" y2="260" stroke="var(--ink)" stroke-width="1.5"/>
+        <line x1="70" y1="260" x2="70" y2="20" stroke="var(--ink)" stroke-width="1.5"/>
+        <line x1="300" y1="20" x2="300" y2="260" stroke="var(--muted)" stroke-dasharray="4 4"/>
+        <line x1="70" y1="140" x2="530" y2="140" stroke="var(--muted)" stroke-dasharray="4 4"/>
+        <g font-size="11">
+          <text x="415" y="45" text-anchor="middle" font-weight="500">nowy krajobraz</text>
+          <text x="415" y="61" text-anchor="middle" font-weight="500">i nowe zachowanie</text>
+          <text x="415" y="80" text-anchor="middle" class="mut">bierzemy</text>
+          <text x="185" y="45" text-anchor="middle">podobny do BBOB,</text>
+          <text x="185" y="61" text-anchor="middle">ale inne rankingi</text>
+          <text x="185" y="80" text-anchor="middle" class="mut">cechy coś pomijają</text>
+          <text x="415" y="175" text-anchor="middle">inny krajobraz,</text>
+          <text x="415" y="191" text-anchor="middle">te same rankingi</text>
+          <text x="415" y="210" text-anchor="middle" class="mut">mało informacji</text>
+          <text x="185" y="190" text-anchor="middle">duplikat BBOB</text>
+          <text x="300" y="285" text-anchor="middle">odległość do BBOB w ELA/LON (w jednostkach ε)</text>
+          <text x="300" y="275" text-anchor="middle" class="mut">1</text>
+          <text x="58" y="144" text-anchor="end" class="mut">1</text>
+          <text x="20" y="140" text-anchor="middle" transform="rotate(-90 20 140)">odległość do BBOB w AOCC (ε)</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Każdy kandydat to punkt. Linie przerywane leżą w odległości ε od najbliższej funkcji BBOB w danej przestrzeni. Lewy górny róg jest ciekawy osobno: tam cechy krajobrazu nie widzą czegoś, co algorytmy widzą.</figcaption>
+  </figure>
+</section>
+
+<section id="karta">
+  <h2><span class="n">06</span>Karta porównania benchmarków</h2>
+  <p>Jedna tabela na wymiarowość. Wiersze to benchmarki, kolumny to metryki zdefiniowane wyżej. Poniżej sam układ, bez wyników.</p>
+  <div class="tbl">
+  <table class="wide">
+    <thead>
+      <tr><th>benchmark</th><th>|B|</th><th>VS@24 ELA</th><th>C@24 ELA</th><th>N ELA</th><th>VS@24 LON</th><th>N LON</th><th>czas wzgl. BBOB</th><th>G@24</th><th>S</th><th>1 − W</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>BBOB</td><td class="num">24</td><td>·</td><td>·</td><td>0 z def.</td><td>·</td><td>0 z def.</td><td>1</td><td>·</td><td>·</td><td>·</td></tr>
+      <tr><td>CEC 2017</td><td class="num">29</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>
+      <tr><td>MA-BBOB (próba)</td><td class="num">·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>
+      <tr><td>GNBG-III</td><td class="num">24</td><td colspan="9" style="font-weight:400;color:var(--muted)">tylko d = 30; trzeba dodać d = 30 do protokołu albo pominąć</td></tr>
+      <tr><td>real-world-bench</td><td class="num">·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td><td>·</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Każda wartość z 95% przedziałem z losowania podzbiorów. Do tego dla każdego problemu: UMAP (ELA, LON), galeria CMLON i krzywe AOCC dla poszczególnych algorytmów.</p>
+</section>
+
+<section id="decyzje">
+  <h2><span class="n">07</span>Do decyzji</h2>
+  <p><b>Skład puli referencyjnej.</b> Czy pula to tylko porównywane benchmarki, czy dokładamy szerokie tło z losowych instancji MA-BBOB, żeby C nie zależało od tego, które benchmarki akurat porównujemy. Zdecydujemy później.</p>
+</section>
+</main>
+</div>
+
+</body></html>
