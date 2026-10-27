@@ -1,4 +1,10 @@
-# bench-atlas
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/bench-atlas-lockup-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/bench-atlas-lockup-light.svg">
+    <img alt="bench-atlas" src="assets/bench-atlas-lockup-light.svg" width="440">
+  </picture>
+</p>
 
 Tools for analysing and comparing continuous black-box optimization benchmarks:
 ELA, LON, diversity, cost and algorithm discrimination.
