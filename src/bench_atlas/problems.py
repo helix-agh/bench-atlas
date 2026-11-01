@@ -43,39 +43,38 @@ class ProblemId:
 class Problem:
     """Minimization problem on [0, 1]^d.
 
-    Calling the problem with a single point ``(d,)`` returns a float; calling it
-    with a batch ``(n, d)`` returns an array ``(n,)``. Every evaluated point is
-    counted in ``evaluations``.
+    The problem is called with a batch of points ``(n, d)`` and returns an array
+    ``(n,)``. Every evaluated point is counted in ``evaluations``.
 
     Attributes:
         id: Stable problem identifier; ``id.dimension`` is the dimension.
         function: Vectorized objective, ``(n, d)`` points on [0, 1]^d -> ``(n,)``.
         name: Human-readable name.
-        optimum: Known global optimum ``(x, f)`` with ``x`` on [0, 1]^d.
+        x_opt: Known global minimizer on [0, 1]^d.
+        f_opt: Known global minimum value.
         evaluations: Number of evaluated points.
     """
 
     id: ProblemId
     function: Callable[[np.ndarray], np.ndarray] = field(repr=False)
     name: str = ""
-    optimum: tuple[np.ndarray, float] | None = None
+    x_opt: np.ndarray | None = None
+    f_opt: float | None = None
     evaluations: int = 0
 
     @property
     def dimension(self) -> int:
         return self.id.dimension
 
-    def __call__(self, x: ArrayLike) -> float | np.ndarray:
+    def __call__(self, x: ArrayLike) -> np.ndarray:
         x = np.asarray(x, dtype=float)
-        single = x.ndim == 1
-        points = np.atleast_2d(x)
-        if points.ndim != 2 or points.shape[1] != self.dimension:
-            raise ValueError(f"Expected points of dimension {self.dimension}, got {x.shape}")
-        y = np.asarray(self.function(points), dtype=float)
-        if y.shape != (len(points),):
-            raise ValueError(f"Expected objective values of shape ({len(points)},), got {y.shape}")
-        self.evaluations += len(points)
-        return float(y[0]) if single else y
+        if x.ndim != 2 or x.shape[1] != self.dimension:
+            raise ValueError(f"Expected points of shape (n, {self.dimension}), got {x.shape}")
+        y = np.asarray(self.function(x), dtype=float)
+        if y.shape != (len(x),):
+            raise ValueError(f"Expected objective values of shape ({len(x)},), got {y.shape}")
+        self.evaluations += len(x)
+        return y
 
 
 def to_unit(x: ArrayLike, lb: ArrayLike, ub: ArrayLike) -> np.ndarray:
@@ -146,7 +145,8 @@ def from_function(
     lb: ArrayLike,
     ub: ArrayLike,
     name: str = "",
-    optimum: tuple[ArrayLike, float] | None = None,
+    x_opt: ArrayLike | None = None,
+    f_opt: float | None = None,
 ) -> Problem:
     """Create a problem from a vectorized function defined on the box [lb, ub].
 
@@ -156,12 +156,17 @@ def from_function(
         lb: Lower bound(s) of the original domain.
         ub: Upper bound(s) of the original domain.
         name: Human-readable name.
-        optimum: Known global optimum ``(x, f)`` with ``x`` in original coordinates.
+        x_opt: Known global minimizer in original coordinates.
+        f_opt: Known global minimum value.
     """
     lb, ub = _box(id.dimension, lb, ub)
-    if optimum is not None:
-        optimum = (to_unit(optimum[0], lb, ub), float(optimum[1]))
-    return Problem(id=id, function=_BoxFunction(function, lb, ub), name=name, optimum=optimum)
+    return Problem(
+        id=id,
+        function=_BoxFunction(function, lb, ub),
+        name=name,
+        x_opt=None if x_opt is None else to_unit(x_opt, lb, ub),
+        f_opt=None if f_opt is None else float(f_opt),
+    )
 
 
 def from_ioh(
@@ -188,15 +193,12 @@ def from_ioh(
             _create_ioh, type(problem), id.function, id.instance, id.dimension
         )
 
-    optimum = None
-    if np.all(np.isfinite(problem.optimum.x)) and np.isfinite(problem.optimum.y):
-        optimum = (np.asarray(problem.optimum.x), problem.optimum.y)
-
     return from_function(
         _IOHFunction(problem, factory),
         id=id,
         lb=problem.bounds.lb,
         ub=problem.bounds.ub,
         name=meta.name,
-        optimum=optimum,
+        x_opt=problem.optimum.x if np.all(np.isfinite(problem.optimum.x)) else None,
+        f_opt=problem.optimum.y if np.isfinite(problem.optimum.y) else None,
     )

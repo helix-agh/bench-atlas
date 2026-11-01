@@ -32,14 +32,13 @@ def test_unit_mapping_roundtrip() -> None:
 
 
 class TestProblem:
-    def test_single_point_and_batch(self) -> None:
+    def test_evaluates_batch(self) -> None:
         problem = from_function(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0)
-        assert problem([0.5, 0.5]) == 0.5
         np.testing.assert_array_equal(problem([[0.0, 0.0], [1.0, 1.0]]), [0.0, 2.0])
 
     def test_counts_evaluations(self) -> None:
         problem = from_function(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0)
-        problem([0.5, 0.5])
+        problem([[0.5, 0.5]])
         problem(np.zeros((4, 2)))
         assert problem.evaluations == 5
 
@@ -53,7 +52,12 @@ class TestProblem:
     def test_rejects_wrong_dimension(self) -> None:
         problem = from_function(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0)
         with pytest.raises(ValueError):
-            problem([0.5, 0.5, 0.5])
+            problem([[0.5, 0.5, 0.5]])
+
+    def test_rejects_single_point(self) -> None:
+        problem = from_function(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0)
+        with pytest.raises(ValueError):
+            problem([0.5, 0.5])
 
 
 class TestFromFunction:
@@ -63,11 +67,11 @@ class TestFromFunction:
             id=ProblemId("test", 1, 1, 2),
             lb=[-5.0, 0.0],
             ub=[5.0, 10.0],
-            optimum=([0.0, 0.0], 0.0),
+            x_opt=[0.0, 0.0],
+            f_opt=0.0,
         )
-        assert problem([0.5, 0.0]) == 0.0
-        assert problem([1.0, 1.0]) == 125.0
-        np.testing.assert_allclose(problem.optimum[0], [0.5, 0.0])
+        np.testing.assert_array_equal(problem([[0.5, 0.0], [1.0, 1.0]]), [0.0, 125.0])
+        np.testing.assert_allclose(problem.x_opt, [0.5, 0.0])
 
     def test_rejects_empty_box(self) -> None:
         with pytest.raises(ValueError):
@@ -86,17 +90,17 @@ class TestFromIOH:
         expected = [raw(x) for x in mapped]
 
         assert problem(points).tolist() == expected
-        assert [problem(u) for u in points] == expected
 
     def test_id_name_and_optimum(self) -> None:
         raw = bbob(3, 2, 5)
         problem = from_ioh(raw, "bbob")
         assert problem.id == ProblemId("bbob", 3, 2, 5)
         assert problem.name == "Rastrigin"
-        x_opt, f_opt = problem.optimum
-        np.testing.assert_allclose(x_opt, to_unit(raw.optimum.x, raw.bounds.lb, raw.bounds.ub))
-        assert f_opt == raw.optimum.y
-        assert problem(x_opt) == pytest.approx(f_opt)
+        np.testing.assert_allclose(
+            problem.x_opt, to_unit(raw.optimum.x, raw.bounds.lb, raw.bounds.ub)
+        )
+        assert problem.f_opt == raw.optimum.y
+        assert problem(problem.x_opt[None, :])[0] == pytest.approx(problem.f_opt)
 
     def test_picklable(self) -> None:
         problem = from_ioh(bbob(3, 2, 5), "bbob")
