@@ -2,9 +2,11 @@
 
 import enum
 
+import pandas as pd
 import typer
 
 from bench_atlas import __version__, suites
+from bench_atlas.ela import ela_features
 
 app = typer.Typer(
     name="bench-atlas",
@@ -58,10 +60,6 @@ def ela(
     orivex features. BBOB and MA-BBOB use instances 1-5; GNBG suites have a
     fixed d = 30 and one instance.
     """
-    import pandas as pd
-
-    from bench_atlas.ela import ela_features
-
     rows = []
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob):
