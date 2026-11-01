@@ -131,6 +131,8 @@ class _GNBG:
     lam: np.ndarray  # (o,)
 
     def __call__(self, u: np.ndarray) -> np.ndarray:
+        if not np.all(np.isfinite(u)):
+            raise ValueError("GNBG points must contain only finite coordinates")
         components = zip(
             self.position,
             self.rotation,

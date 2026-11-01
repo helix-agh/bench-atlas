@@ -59,6 +59,23 @@ def test_value_at_optimum(gnbg: tuple[str, list[Problem]]) -> None:
         assert problem(problem.x_opt[None, :])[0] == problem.f_opt
 
 
+@pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
+@pytest.mark.parametrize("whole_point", [False, True])
+def test_rejects_nonfinite_coordinates(
+    gnbg: tuple[str, list[Problem]], value: float, whole_point: bool
+) -> None:
+    for problem in gnbg[1]:
+        x = np.full((2, problem.dimension), 0.5)
+        if whole_point:
+            x[1] = value
+        else:
+            x[1, 0] = value
+        evaluations = problem.evaluations
+        with pytest.raises(ValueError, match="finite coordinates"):
+            problem(x)
+        assert problem.evaluations == evaluations
+
+
 def test_picklable(gnbg: tuple[str, list[Problem]]) -> None:
     x = np.random.default_rng(0).random((5, 30))
     for problem in gnbg[1]:
