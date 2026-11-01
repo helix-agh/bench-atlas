@@ -22,11 +22,20 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", SUBCOMMANDS)
+@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c != "timing"])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
     assert "not implemented" in result.output
+
+
+def test_timing() -> None:
+    result = runner.invoke(app, ["timing", "bbob", "-d", "2"])
+    assert result.exit_code == 0
+    lines = result.stdout.splitlines()
+    assert lines[0] == "problem,time_us"
+    assert len(lines) == 1 + 24
+    assert lines[1].startswith("bbob_f1_i1_d2,")
 
 
 def test_core_dependencies_import() -> None:
