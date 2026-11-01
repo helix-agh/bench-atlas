@@ -5,12 +5,10 @@ import numpy as np
 import pytest
 
 from bench_atlas.problems import (
-    Problem,
     ProblemId,
     from_function,
     from_ioh,
     from_unit,
-    make_instance,
     to_unit,
 )
 
@@ -23,31 +21,8 @@ def sphere(x: np.ndarray) -> np.ndarray:
     return np.sum(x**2, axis=1)
 
 
-def rastrigin(x: np.ndarray) -> np.ndarray:
-    return 10 * x.shape[1] + np.sum(x**2 - 10 * np.cos(2 * np.pi * x), axis=1)
-
-
-def sphere_instance(seed: int = 0, instance: int = 1, dimension: int = 3, **kwargs) -> Problem:
-    return make_instance(
-        sphere,
-        id=ProblemId("test", 1, instance, dimension),
-        lb=-5.0,
-        ub=5.0,
-        x_opt=np.zeros(dimension),
-        seed=seed,
-        **kwargs,
-    )
-
-
-class TestProblemId:
-    def test_str_roundtrip(self) -> None:
-        pid = ProblemId("ma_bbob", 12, 3, 5)
-        assert str(pid) == "ma_bbob_f12_i3_d5"
-        assert ProblemId.parse(str(pid)) == pid
-
-    def test_parse_rejects_garbage(self) -> None:
-        with pytest.raises(ValueError):
-            ProblemId.parse("bbob-1-2-3")
+def test_problem_id_str() -> None:
+    assert str(ProblemId("ma_bbob", 12, 3, 5)) == "ma_bbob_f12_i3_d5"
 
 
 def test_unit_mapping_roundtrip() -> None:
@@ -67,6 +42,13 @@ class TestProblem:
         problem([0.5, 0.5])
         problem(np.zeros((4, 2)))
         assert problem.evaluations == 5
+
+    def test_rejects_wrong_output_shape(self) -> None:
+        problem = from_function(
+            lambda x: sphere(x)[:, None], id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0
+        )
+        with pytest.raises(ValueError):
+            problem(np.zeros((3, 2)))
 
     def test_rejects_wrong_dimension(self) -> None:
         problem = from_function(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0)
@@ -122,61 +104,3 @@ class TestFromIOH:
         clone = pickle.loads(pickle.dumps(problem))
         assert clone.id == problem.id
         np.testing.assert_array_equal(clone(points), problem(points))
-
-
-class TestMakeInstance:
-    def test_reproducible_from_seed(self) -> None:
-        points = np.random.default_rng(1).random((10, 3))
-        a, b = sphere_instance(seed=42), sphere_instance(seed=42)
-        np.testing.assert_array_equal(a(points), b(points))
-        np.testing.assert_array_equal(a.optimum[0], b.optimum[0])
-        assert a.optimum[1] == b.optimum[1]
-
-    @pytest.mark.parametrize(
-        "other", [{"seed": 43}, {"seed": 42, "instance": 2}], ids=["seed", "instance"]
-    )
-    def test_differs_across_seeds_and_instances(self, other: dict) -> None:
-        a, b = sphere_instance(seed=42), sphere_instance(**other)
-        assert not np.allclose(a.optimum[0], b.optimum[0])
-
-    @pytest.mark.parametrize("seed", range(20))
-    def test_optimum_inside_domain(self, seed: int) -> None:
-        problem = sphere_instance(seed=seed, dimension=5)
-        x_opt, f_opt = problem.optimum
-        assert np.all((x_opt >= 0.1) & (x_opt <= 0.9))
-        assert problem(x_opt) == pytest.approx(f_opt)
-
-    @pytest.mark.parametrize("function", [sphere, rastrigin])
-    def test_optimum_is_minimum(self, function) -> None:
-        problem = make_instance(
-            function,
-            id=ProblemId("test", 1, 1, 4),
-            lb=-5.12,
-            ub=5.12,
-            x_opt=np.zeros(4),
-            seed=7,
-        )
-        points = np.random.default_rng(0).random((200, 4))
-        assert problem(points).min() > problem.optimum[1]
-
-    def test_rotation_preserves_sphere(self) -> None:
-        problem = sphere_instance(seed=3, dimension=4)
-        u = np.random.default_rng(2).random((1, 4))
-        x_star = from_unit(problem.optimum[0], -5.0, 5.0)
-        expected = sphere(from_unit(u, -5.0, 5.0) - x_star) + problem.optimum[1]
-        np.testing.assert_allclose(problem(u), expected)
-
-    def test_identity_when_disabled(self) -> None:
-        problem = sphere_instance(seed=3, shift=False, rotate=False, offset=False)
-        u = np.random.default_rng(2).random((5, 3))
-        np.testing.assert_allclose(problem(u), sphere(from_unit(u, -5.0, 5.0)))
-        assert problem.optimum[1] == 0.0
-
-    def test_picklable(self) -> None:
-        problem = sphere_instance(seed=3)
-        points = np.random.default_rng(0).random((5, 3))
-        np.testing.assert_array_equal(pickle.loads(pickle.dumps(problem))(points), problem(points))
-
-    def test_rejects_optimum_outside_domain(self) -> None:
-        with pytest.raises(ValueError):
-            make_instance(sphere, id=ProblemId("test", 1, 1, 2), lb=0.0, ub=1.0, x_opt=[2.0, 0.5])

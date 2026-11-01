@@ -9,7 +9,6 @@ interface.
 from __future__ import annotations
 
 import functools
-import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -26,13 +25,8 @@ __all__ = [
     "from_function",
     "from_ioh",
     "from_unit",
-    "make_instance",
     "to_unit",
 ]
-
-_ID_PATTERN = re.compile(
-    r"^(?P<suite>.+)_f(?P<function>\d+)_i(?P<instance>\d+)_d(?P<dimension>\d+)$"
-)
 
 
 @dataclass(frozen=True, order=True)
@@ -46,19 +40,6 @@ class ProblemId:
 
     def __str__(self) -> str:
         return f"{self.suite}_f{self.function}_i{self.instance}_d{self.dimension}"
-
-    @classmethod
-    def parse(cls, value: str) -> ProblemId:
-        """Inverse of ``str(problem_id)``."""
-        match = _ID_PATTERN.match(value)
-        if match is None:
-            raise ValueError(f"Invalid problem id: {value!r}")
-        return cls(
-            suite=match["suite"],
-            function=int(match["function"]),
-            instance=int(match["instance"]),
-            dimension=int(match["dimension"]),
-        )
 
 
 @dataclass(eq=False)
@@ -94,6 +75,8 @@ class Problem:
         if points.ndim != 2 or points.shape[1] != self.dimension:
             raise ValueError(f"Expected points of dimension {self.dimension}, got {x.shape}")
         y = np.asarray(self.function(points), dtype=float)
+        if y.shape != (len(points),):
+            raise ValueError(f"Expected objective values of shape ({len(points)},), got {y.shape}")
         self.evaluations += len(points)
         return float(y[0]) if single else y
 
@@ -112,7 +95,7 @@ def from_unit(u: ArrayLike, lb: ArrayLike, ub: ArrayLike) -> np.ndarray:
 
 @dataclass(frozen=True, eq=False)
 class _BoxFunction:
-    """``u -> base(R (x - shift) + x_opt) + offset`` with ``x = from_unit(u)``.
+    """``u -> base(from_unit(u, lb, ub))``.
 
     A plain picklable object (rather than a closure) so that problems can be
     sent to parallel workers.
@@ -121,16 +104,9 @@ class _BoxFunction:
     base: Callable[[np.ndarray], np.ndarray]
     lb: np.ndarray
     ub: np.ndarray
-    rotation: np.ndarray | None = None
-    shift: np.ndarray | None = None
-    x_opt: np.ndarray | None = None
-    offset: float = 0.0
 
     def __call__(self, u: np.ndarray) -> np.ndarray:
-        x = from_unit(u, self.lb, self.ub)
-        if self.rotation is not None:
-            x = (x - self.shift) @ self.rotation.T + self.x_opt
-        return np.asarray(self.base(x), dtype=float) + self.offset
+        return self.base(from_unit(u, self.lb, self.ub))
 
 
 class _IOHFunction:
@@ -226,68 +202,4 @@ def from_ioh(
         ub=problem.bounds.ub,
         name=meta.name,
         optimum=optimum,
-    )
-
-
-def _random_rotation(rng: np.random.Generator, dimension: int) -> np.ndarray:
-    # QR of a Gaussian matrix with sign correction gives a Haar-uniform rotation.
-    q, r = np.linalg.qr(rng.standard_normal((dimension, dimension)))
-    return q * np.sign(np.diag(r))
-
-
-def _bbob_offset(rng: np.random.Generator) -> float:
-    # Same distribution as the BBOB f_opt: a rounded, clipped Cauchy variate.
-    value = np.round(100.0 * rng.standard_normal() / rng.standard_normal()) / 100.0
-    return float(np.clip(value, -1000.0, 1000.0))
-
-
-def make_instance(
-    function: Callable[[np.ndarray], np.ndarray],
-    *,
-    id: ProblemId,
-    lb: ArrayLike,
-    ub: ArrayLike,
-    x_opt: ArrayLike,
-    name: str = "",
-    seed: int = 0,
-    shift: bool = True,
-    rotate: bool = True,
-    offset: bool = True,
-) -> Problem:
-    """Create a seeded BBOB-style instance of a problem without native instances.
-
-    The instance is ``g(x) = f(R (x - x*) + x_opt) + f*`` on [lb, ub], seen on
-    [0, 1]^d, where ``x_opt`` is the known global minimizer of ``f``:
-
-    - ``x*`` (shift) is uniform in the central 80% of the domain, like BBOB's
-      [-4, 4]^d within [-5, 5]^d, so the optimum stays inside the domain,
-    - ``R`` (rotation) is a uniformly random orthogonal matrix,
-    - ``f*`` (offset) follows the BBOB distribution.
-
-    The random state is derived from ``(seed, function, instance, dimension)`` of
-    ``id``, so instances are reproducible and independent of creation order.
-
-    Rotation maps parts of the domain outside the original box, so ``f`` must
-    be defined there and ``x_opt`` must remain its global minimizer.
-    """
-    lb, ub = _box(id.dimension, lb, ub)
-    x_opt = np.asarray(x_opt, dtype=float)
-    if x_opt.shape != (id.dimension,):
-        raise ValueError(f"x_opt must have shape ({id.dimension},), got {x_opt.shape}")
-    if np.any(x_opt < lb) or np.any(x_opt > ub):
-        raise ValueError("x_opt must lie inside [lb, ub]")
-
-    seed_seq = np.random.SeedSequence(seed, spawn_key=(id.function, id.instance, id.dimension))
-    rng = np.random.default_rng(seed_seq)
-    margin = 0.1 * (ub - lb)
-    x_star = rng.uniform(lb + margin, ub - margin) if shift else x_opt
-    rotation = _random_rotation(rng, id.dimension) if rotate else np.eye(id.dimension)
-    f_star = _bbob_offset(rng) if offset else 0.0
-
-    f_opt = float(np.asarray(function(x_opt[None, :]))[0]) + f_star
-    return Problem(
-        id=id,
-        function=_BoxFunction(function, lb, ub, rotation, x_star, x_opt, f_star),
-        name=name,
-        optimum=(to_unit(x_star, lb, ub), f_opt),
     )
