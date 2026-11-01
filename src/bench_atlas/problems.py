@@ -9,15 +9,12 @@ interface.
 from __future__ import annotations
 
 import functools
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
-
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
-    from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike
 
 __all__ = [
     "Problem",
