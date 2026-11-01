@@ -7,9 +7,10 @@ from collections.abc import Iterable
 
 import ioh
 
+from bench_atlas.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.problems import Problem, from_ioh
 
-__all__ = ["bbob", "ma_bbob"]
+__all__ = ["bbob", "gnbg_i", "gnbg_ii", "gnbg_iii", "ma_bbob"]
 
 
 def bbob(dimensions: Iterable[int], instances: Iterable[int]) -> list[Problem]:
