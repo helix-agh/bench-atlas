@@ -7,6 +7,13 @@ import pytest
 from bench_atlas.gnbg import gnbg_ii, gnbg_iii
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
+
+def uniform(suite: str, function: int, n: int, d: int) -> np.ndarray:
+    """Points on [0, 1)^d from raw PCG64 output; must match make_gnbg_reference.py."""
+    seed = np.random.SeedSequence([int.from_bytes(suite.encode(), "little"), function])
+    return (np.random.PCG64(seed).random_raw((n, d)) >> 11) * 2.0**-53
+
+
 GNBG = {"gnbg_ii": (gnbg_ii, 24), "gnbg_iii": (gnbg_iii, 22)}
 
 
@@ -35,6 +42,16 @@ def test_matches_official_code(gnbg: tuple[str, list[Problem]]) -> None:
         # rtol: mapping the points to [0, 1]^d alone changes f by up to ~2e-11.
         np.testing.assert_allclose(problem(to_unit(x, -100.0, 100.0)), y, rtol=1e-10)
         assert y[0] == problem.f_opt  # the first reference point is the optimum
+
+
+def test_matches_official_code_uniform(gnbg: tuple[str, list[Problem]]) -> None:
+    # Reference values at 5000 points uniform in the box per problem.
+    suite, problems = gnbg
+    reference = np.load(Path(__file__).parent / "data" / f"{suite}_reference.npz")
+    for problem in problems:
+        y = reference[f"f{problem.id.function}_uniform_y"]
+        u = uniform(suite, problem.id.function, len(y), problem.dimension)
+        np.testing.assert_allclose(problem(u), y, rtol=1e-10)
 
 
 def test_value_at_optimum(gnbg: tuple[str, list[Problem]]) -> None:

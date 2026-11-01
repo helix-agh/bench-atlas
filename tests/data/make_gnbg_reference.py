@@ -1,4 +1,4 @@
-"""Generate reference values for tests/test_suites.py with the official GNBG code.
+"""Generate reference values for tests/test_gnbg.py with the official GNBG code.
 
 The official Python code of GNBG-II (``GNBG_instances.py``) and GNBG-III
 (``fitness.py`` and the loader in ``gnbg_iii_competition_harness.py``) needs
@@ -7,8 +7,14 @@ numpy < 2.3, so run it in a separate environment, from the repository root:
     uv run --no-project --python 3.12 --with "numpy<2.3" --with scipy \
         python tests/data/make_gnbg_reference.py
 
-Points per problem (original coordinates): the optimum itself, 10 uniform in the
-box, 10 near the optimum and one near the minimum of every component.
+Points per problem (original coordinates):
+
+- ``f{n}_x`` / ``f{n}_y``: the optimum itself, 10 points near the optimum and one
+  near the minimum of every component;
+- ``f{n}_uniform_y``: values at ``UNIFORM`` points uniform in the box, given by
+  ``uniform`` below. Only the values are stored: the points are rebuilt from raw
+  PCG64 output, which is stable across numpy versions (unlike ``Generator``
+  methods), with the same function in the test.
 """
 
 import ast
@@ -31,6 +37,13 @@ GNBG_III_URL = (
     "b263a6520b68e2f46735235c2c81ed0778edb58d/GNBG_III_Python.zip"
 )
 DATA = Path(__file__).parent
+UNIFORM = 5000
+
+
+def uniform(suite: str, function: int, n: int, d: int) -> np.ndarray:
+    """Points on [0, 1)^d from raw PCG64 output; must match tests/test_gnbg.py."""
+    seed = np.random.SeedSequence([int.from_bytes(suite.encode(), "little"), function])
+    return (np.random.PCG64(seed).random_raw((n, d)) >> 11) * 2.0**-53
 
 
 def download(url: str, tmp: str) -> Path:
@@ -44,7 +57,6 @@ def points(rng, lb, ub, x_opt, minima):
     return np.vstack(
         [
             x_opt[None, :],
-            rng.uniform(lb, ub, (10, d)),
             x_opt + rng.normal(0, 1e-2 * (ub - lb), (10, d)),
             minima + rng.normal(0, 1e-3 * (ub - lb), minima.shape),
         ]
@@ -79,6 +91,10 @@ def gnbg_ii(code: Path) -> dict:
             gnbg.CompMinPos.reshape(-1, gnbg.Dimension),
         )
         out[f"f{f}_x"], out[f"f{f}_y"] = x, gnbg.fitness(x)
+        u = uniform("gnbg_ii", f, UNIFORM, gnbg.Dimension)
+        out[f"f{f}_uniform_y"] = gnbg.fitness(
+            gnbg.MinCoordinate + u * (gnbg.MaxCoordinate - gnbg.MinCoordinate)
+        )
     return out
 
 
@@ -99,8 +115,10 @@ def gnbg_iii(code: Path) -> dict:
             np.ravel(g["OptimumPosition"]),
             np.reshape(g["Component_MinimumPosition"], (-1, d)),
         )
-        g["FEhistory"] = np.zeros(len(x) + 1)
+        g["FEhistory"] = np.zeros(len(x) + UNIFORM + 1)
         out[f"f{f}_x"], out[f"f{f}_y"] = x, fitness(x, g)[0]
+        lb, ub = float(g["MinCoordinate"]), float(g["MaxCoordinate"])
+        out[f"f{f}_uniform_y"] = fitness(lb + uniform("gnbg_iii", f, UNIFORM, d) * (ub - lb), g)[0]
     return out
 
 
