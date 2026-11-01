@@ -1,11 +1,12 @@
 import pickle
+from pathlib import Path
 
 import ioh
 import numpy as np
 import pytest
 
 from bench_atlas.problems import Problem, ProblemId, from_unit
-from bench_atlas.suites import bbob, ma_bbob
+from bench_atlas.suites import bbob, gnbg_iii, ma_bbob
 
 DIMENSIONS = [2, 5]
 INSTANCES = [1, 2, 3]
@@ -44,3 +45,31 @@ def test_ma_bbob_identical_to_ioh() -> None:
     mapped = from_unit(points, raw.bounds.lb, raw.bounds.ub)
     assert problem.id == ProblemId("ma_bbob", 0, 7, 5)
     assert problem(points).tolist() == [raw(x) for x in mapped]
+
+
+@pytest.fixture(scope="module")
+def gnbg_iii_problems() -> list[Problem]:
+    return gnbg_iii()
+
+
+class TestGNBGIII:
+    def test_static_problems_only(self, gnbg_iii_problems: list[Problem]) -> None:
+        assert [problem.id for problem in gnbg_iii_problems] == [
+            ProblemId("gnbg_iii", function, 1, 30) for function in range(1, 23)
+        ]
+
+    def test_matches_official_code(self, gnbg_iii_problems: list[Problem]) -> None:
+        # Reference values from the official GNBG-III code, in original coordinates;
+        # see tests/data/make_gnbg_iii_reference.py.
+        reference = np.load(Path(__file__).parent / "data" / "gnbg_iii_reference.npz")
+        for problem in gnbg_iii_problems:
+            x = reference[f"f{problem.id.function}_x"]
+            y = reference[f"f{problem.id.function}_y"]
+            values = problem.function.base(x)
+            np.testing.assert_allclose(values, y, rtol=1e-12)
+            assert values[0] == y[0] == problem.f_opt  # the first point is the optimum
+
+    def test_picklable(self, gnbg_iii_problems: list[Problem]) -> None:
+        x = np.random.default_rng(0).random((5, 30))
+        for problem in gnbg_iii_problems:
+            np.testing.assert_array_equal(pickle.loads(pickle.dumps(problem))(x), problem(x))
