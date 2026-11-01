@@ -30,12 +30,13 @@ def test_placeholder_subcommands_exit_with_error(command: str) -> None:
 
 
 def test_timing() -> None:
-    result = runner.invoke(app, ["timing", "bbob", "-d", "2"])
+    result = runner.invoke(app, ["timing", "bbob", "-d", "2", "-b", "1", "-b", "10"])
     assert result.exit_code == 0
     lines = result.stdout.splitlines()
-    assert lines[0] == "problem,time_us"
-    assert len(lines) == 1 + 24
-    assert lines[1].startswith("bbob_f1_i1_d2,")
+    assert lines[0] == "problem,batch_size,time_us"
+    assert len(lines) == 1 + 24 * 2
+    assert lines[1].startswith("bbob_f1_i1_d2,1,")
+    assert lines[2].startswith("bbob_f1_i1_d2,10,")
 
 
 def test_core_dependencies_import() -> None:

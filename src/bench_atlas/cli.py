@@ -63,22 +63,28 @@ def timing(
     dimension: list[int] = typer.Option(
         [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
     ),
+    batch_size: list[int] = typer.Option(
+        [1], "--batch-size", "-b", min=1, help="Points evaluated per call."
+    ),
 ) -> None:
     """Measure evaluation cost of benchmark problems.
 
-    Prints CSV: problem id and the median time of one evaluation in microseconds.
-    BBOB and MA-BBOB use instance 1; GNBG suites have a fixed d = 30.
+    Prints CSV: problem id, batch size and the median evaluation time per point
+    in microseconds. BBOB and MA-BBOB use instance 1; GNBG suites have a fixed
+    d = 30.
     """
     from bench_atlas.timing import evaluation_time
 
-    typer.echo("problem,time_us")
+    typer.echo("problem,batch_size,time_us")
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob):
             problems = getattr(suites, name.value)(dimension, [1])
         else:
             problems = getattr(suites, name.value)()
         for problem in problems:
-            typer.echo(f"{problem.id},{evaluation_time(problem) * 1e6:.2f}")
+            for size in batch_size:
+                time_us = evaluation_time(problem, batch_size=size) * 1e6
+                typer.echo(f"{problem.id},{size},{time_us:.4g}")
 
 
 @app.command()
