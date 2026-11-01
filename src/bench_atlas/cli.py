@@ -37,24 +37,49 @@ def main(
     """Analyse and compare continuous black-box optimization benchmarks."""
 
 
-@app.command()
-def ela() -> None:
-    """Compute ELA features."""
-    _not_implemented("ela")
-
-
-@app.command()
-def lon() -> None:
-    """Build local optima networks and compute LON metrics."""
-    _not_implemented("lon")
-
-
 class Suite(enum.StrEnum):
     bbob = "bbob"
     ma_bbob = "ma_bbob"
     gnbg_i = "gnbg_i"
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
+
+
+@app.command()
+def ela(
+    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
+    dimension: list[int] = typer.Option(
+        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+) -> None:
+    """Compute ELA features.
+
+    Prints CSV: one row per problem and sample seed (0-9) with ``f_med`` and all
+    orivex features. BBOB and MA-BBOB use instances 1-5; GNBG suites have a
+    fixed d = 30 and one instance.
+    """
+    import pandas as pd
+
+    from bench_atlas.ela import ela_features
+
+    rows = []
+    for name in suite:
+        if name in (Suite.bbob, Suite.ma_bbob):
+            problems = getattr(suites, name.value)(dimension, range(1, 6))
+        else:
+            problems = getattr(suites, name.value)()
+        for problem in problems:
+            for seed in range(10):
+                rows.append(
+                    {"problem": str(problem.id), "seed": seed, **ela_features(problem, seed)}
+                )
+    typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
+
+
+@app.command()
+def lon() -> None:
+    """Build local optima networks and compute LON metrics."""
+    _not_implemented("lon")
 
 
 @app.command()

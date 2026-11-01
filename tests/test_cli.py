@@ -1,3 +1,6 @@
+import io
+
+import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
@@ -22,7 +25,7 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c != "timing"])
+@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "timing")])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
@@ -37,6 +40,15 @@ def test_timing() -> None:
     assert len(lines) == 1 + 24 * 2
     assert lines[1].startswith("bbob_f1_i1_d2,1,")
     assert lines[2].startswith("bbob_f1_i1_d2,10,")
+
+
+def test_ela_on_bbob() -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2"])
+    assert result.exit_code == 0
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 5 * 10
+    assert table["problem"].iloc[0] == "bbob_f1_i1_d2"
+    assert not table.isna().any().any()
 
 
 def test_core_dependencies_import() -> None:
