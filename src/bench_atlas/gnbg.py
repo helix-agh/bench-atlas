@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import io
 import re
+import shutil
+import tempfile
 import urllib.request
 import zipfile
 from dataclasses import dataclass
@@ -22,7 +24,7 @@ from pathlib import Path
 import numpy as np
 from scipy.io import loadmat
 
-from bench_atlas.problems import Problem, ProblemId, from_function
+from bench_atlas.problems import Problem, ProblemId, to_unit
 
 __all__ = ["gnbg_ii", "gnbg_iii"]
 
@@ -66,12 +68,15 @@ def _download(url: str, cache: Path, pattern: re.Pattern[str]) -> dict[int, Path
     if not cache.exists():
         with urllib.request.urlopen(url) as response:
             archive = zipfile.ZipFile(io.BytesIO(response.read()))
-        partial = cache.with_name(cache.name + ".partial")
-        partial.mkdir(parents=True, exist_ok=True)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        partial = Path(tempfile.mkdtemp(dir=cache.parent))  # one per caller
         for member in archive.namelist():
             if pattern.fullmatch(Path(member).name):
                 (partial / Path(member).name).write_bytes(archive.read(member))
-        partial.rename(cache)
+        try:
+            partial.rename(cache)
+        except OSError:  # another process published the cache first
+            shutil.rmtree(partial)
     return {
         int(match[1]): path for path in cache.iterdir() if (match := pattern.fullmatch(path.name))
     }
@@ -80,8 +85,10 @@ def _download(url: str, cache: Path, pattern: re.Pattern[str]) -> dict[int, Path
 def _gnbg(path: Path, suite: str, number: int) -> Problem:
     g = loadmat(path, squeeze_me=True)["GNBG"][()]
     o, d = int(g["o"]), int(g["Dimension"])
+    lb, ub = float(g["MinCoordinate"]), float(g["MaxCoordinate"])
     function = _GNBG(
-        position=_array(g, "Component_MinimumPosition", o, d),
+        position=to_unit(_array(g, "Component_MinimumPosition", o, d), lb, ub),
+        width=ub - lb,
         rotation=np.ascontiguousarray(np.moveaxis(_array(g, "RotationMatrix", d, d, o), 2, 0)),
         sigma=_array(g, "ComponentSigma", o),
         h=_array(g, "Component_H", o, d),
@@ -89,13 +96,11 @@ def _gnbg(path: Path, suite: str, number: int) -> Problem:
         omega=_array(g, "Omega", o, 4),
         lam=_array(g, "lambda", o),
     )
-    return from_function(
-        function,
+    return Problem(
         id=ProblemId(suite, number, 1, d),
-        lb=float(g["MinCoordinate"]),
-        ub=float(g["MaxCoordinate"]),
+        function=function,
         name=path.stem.partition("_")[2],
-        x_opt=_array(g, "OptimumPosition", d),
+        x_opt=to_unit(_array(g, "OptimumPosition", d), lb, ub),
         f_opt=float(g["OptimumValue"]),
     )
 
@@ -107,11 +112,17 @@ def _array(g: np.void, key: str, *shape: int) -> np.ndarray:
 
 @dataclass(frozen=True, eq=False)
 class _GNBG:
-    """Vectorized GNBG objective: the minimum over components k of
+    """Vectorized GNBG objective on [0, 1]^d: the minimum over components k of
     ``sigma_k + (sum_i h_ki T_k(z_i)^2) ** lam_k`` with ``z = R_k (x - m_k)``.
+
+    ``x - m_k`` is computed as ``(u - u_k) * width`` in unit coordinates, so
+    that the optimum, which is the minimum of one component, gives exactly
+    ``f_opt``: with exponents down to 0.05, mapping ``u`` back to the box first
+    turns rounding errors of 1e-14 into errors of up to 0.1 in f.
     """
 
-    position: np.ndarray  # (o, d)
+    position: np.ndarray  # (o, d), on [0, 1]^d
+    width: float  # ub - lb of the original box
     rotation: np.ndarray  # (o, d, d)
     sigma: np.ndarray  # (o,)
     h: np.ndarray  # (o, d)
@@ -119,7 +130,7 @@ class _GNBG:
     omega: np.ndarray  # (o, 4)
     lam: np.ndarray  # (o,)
 
-    def __call__(self, x: np.ndarray) -> np.ndarray:
+    def __call__(self, u: np.ndarray) -> np.ndarray:
         components = zip(
             self.position,
             self.rotation,
@@ -132,7 +143,8 @@ class _GNBG:
         )
         return np.min(
             [
-                sigma + np.sum(h * _transform((x - m) @ r.T, mu, omega) ** 2, axis=1) ** lam
+                sigma
+                + np.sum(h * _transform((u - m) * self.width @ r.T, mu, omega) ** 2, axis=1) ** lam
                 for m, r, sigma, h, mu, omega, lam in components
             ],
             axis=0,
