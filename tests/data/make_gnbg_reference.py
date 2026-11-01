@@ -2,7 +2,9 @@
 
 The official Python code of GNBG-II (``GNBG_instances.py``) and GNBG-III
 (``fitness.py`` and the loader in ``gnbg_iii_competition_harness.py``) needs
-numpy < 2.3, so run it in a separate environment, from the repository root:
+numpy < 2.3, so run it in a separate environment, from the repository root.
+GNBG-I ships only MATLAB code, so its values come from the GNBG-II ``GNBG``
+class (same generator and formula).
 
     uv run --no-project --python 3.12 --with "numpy<2.3" --with scipy \
         python tests/data/make_gnbg_reference.py
@@ -28,6 +30,10 @@ from pathlib import Path
 import numpy as np
 from scipy.io import loadmat
 
+GNBG_I_URL = (
+    "https://raw.githubusercontent.com/rohitsalgotra/GNBG-I/"
+    "35dad28f53add8cf726932e929b7da2d0cf184f6/GNBG_Instances.MATLAB.zip"
+)
 GNBG_II_URL = (
     "https://raw.githubusercontent.com/rohitsalgotra/GNBG-II/"
     "59d506ed0b317082950d48dd75f21ed2f02aed62/GNBG_Instances.Python-main.zip"
@@ -49,7 +55,7 @@ def uniform(suite: str, function: int, n: int, d: int) -> np.ndarray:
 def download(url: str, tmp: str) -> Path:
     with urllib.request.urlopen(url) as response:
         zipfile.ZipFile(io.BytesIO(response.read())).extractall(tmp)
-    return next(Path(tmp).iterdir())
+    return next(path for path in Path(tmp).iterdir() if path.name != "__MACOSX")
 
 
 def points(rng, lb, ub, x_opt, minima):
@@ -63,20 +69,24 @@ def points(rng, lb, ub, x_opt, minima):
     )
 
 
-def gnbg_ii(code: Path) -> dict:
+def gnbg_ii_class(code: Path) -> type:
     # GNBG_instances.py runs an optimizer on import, so only its GNBG class is used.
     source = (code / "GNBG_instances.py").read_text()
     (cls,) = [node for node in ast.parse(source).body if isinstance(node, ast.ClassDef)]
     namespace = {"np": np}
     exec(ast.get_source_segment(source, cls), namespace)
+    return namespace["GNBG"]
 
-    rng, out = np.random.default_rng(2025), {}
+
+def gnbg_ii(code: Path, suite: str = "gnbg_ii", seed: int = 2025) -> dict:
+    """GNBG-II-style suite: f1.mat-f24.mat in ``code``, evaluated with GNBG_CLASS."""
+    rng, out = np.random.default_rng(seed), {}
     for f in range(1, 25):
         # The loading code of GNBG_instances.py.
         g = loadmat(code / f"f{f}.mat")["GNBG"]
         scalar = lambda key: np.array([item[0] for item in g[key].flatten()])[0, 0]  # noqa: E731, B023
         array = lambda key: np.array(g[key][0, 0])  # noqa: E731, B023
-        gnbg = namespace["GNBG"](
+        gnbg = GNBG_CLASS(
             np.inf, scalar("AcceptanceThreshold"), scalar("Dimension"), scalar("o"),
             scalar("MinCoordinate"), scalar("MaxCoordinate"), array("Component_MinimumPosition"),
             np.array(g["ComponentSigma"][0, 0], dtype=np.float64), array("Component_H"),
@@ -91,7 +101,7 @@ def gnbg_ii(code: Path) -> dict:
             gnbg.CompMinPos.reshape(-1, gnbg.Dimension),
         )
         out[f"f{f}_x"], out[f"f{f}_y"] = x, gnbg.fitness(x)
-        u = uniform("gnbg_ii", f, UNIFORM, gnbg.Dimension)
+        u = uniform(suite, f, UNIFORM, gnbg.Dimension)
         out[f"f{f}_uniform_y"] = gnbg.fitness(
             gnbg.MinCoordinate + u * (gnbg.MaxCoordinate - gnbg.MinCoordinate)
         )
@@ -122,10 +132,14 @@ def gnbg_iii(code: Path) -> dict:
     return out
 
 
-for name, url, make in [
-    ("gnbg_ii", GNBG_II_URL, gnbg_ii),
-    ("gnbg_iii", GNBG_III_URL, gnbg_iii),
-]:
-    with tempfile.TemporaryDirectory() as tmp:
-        np.savez_compressed(DATA / f"{name}_reference.npz", **make(download(url, tmp)))
-    print(f"wrote {name}_reference.npz with numpy {np.__version__}")
+with tempfile.TemporaryDirectory() as tmp:
+    gnbg_ii_code = download(GNBG_II_URL, tmp)
+    GNBG_CLASS = gnbg_ii_class(gnbg_ii_code)
+    with tempfile.TemporaryDirectory() as tmp_i, tempfile.TemporaryDirectory() as tmp_iii:
+        for name, values in [
+            ("gnbg_i", lambda: gnbg_ii(download(GNBG_I_URL, tmp_i), "gnbg_i", 2024)),
+            ("gnbg_ii", lambda: gnbg_ii(gnbg_ii_code)),
+            ("gnbg_iii", lambda: gnbg_iii(download(GNBG_III_URL, tmp_iii))),
+        ]:
+            np.savez_compressed(DATA / f"{name}_reference.npz", **values())
+            print(f"wrote {name}_reference.npz with numpy {np.__version__}")

@@ -1,4 +1,4 @@
-"""GNBG suites: GNBG-II and the static problems of GNBG-III.
+"""GNBG suites: GNBG-I, GNBG-II and the static problems of GNBG-III.
 
 The problem files are downloaded once from the official repositories (pinned
 commits) into ``CACHE``; their code and data are not redistributed here. The
@@ -26,9 +26,13 @@ from scipy.io import loadmat
 
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
-__all__ = ["gnbg_ii", "gnbg_iii"]
+__all__ = ["gnbg_i", "gnbg_ii", "gnbg_iii"]
 
 CACHE = Path.home() / ".cache" / "bench-atlas"
+GNBG_I_URL = (
+    "https://raw.githubusercontent.com/rohitsalgotra/GNBG-I/"
+    "35dad28f53add8cf726932e929b7da2d0cf184f6/GNBG_Instances.MATLAB.zip"
+)
 GNBG_II_URL = (
     "https://raw.githubusercontent.com/rohitsalgotra/GNBG-II/"
     "59d506ed0b317082950d48dd75f21ed2f02aed62/GNBG_Instances.Python-main.zip"
@@ -37,6 +41,17 @@ GNBG_III_URL = (
     "https://raw.githubusercontent.com/rohitsalgotra/GNBG-III/"
     "b263a6520b68e2f46735235c2c81ed0778edb58d/GNBG_III_Python.zip"
 )
+
+
+def gnbg_i() -> list[Problem]:
+    """The 24 GNBG-I problems f1-f24 of the 2024 GECCO competition.
+
+    All problems have d = 30 and a single instance. This is the corrected
+    version from December 2024: in the original files (November 2023), f20
+    records a wrong optimum and all five components of f24 coincide.
+    """
+    files = _download(GNBG_I_URL, CACHE / "gnbg_i", re.compile(r"f(\d+)\.mat"))
+    return [_gnbg(files[number], "gnbg_i", number) for number in range(1, 25)]
 
 
 def gnbg_ii() -> list[Problem]:

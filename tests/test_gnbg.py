@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bench_atlas.gnbg import gnbg_ii, gnbg_iii
+from bench_atlas.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
 
@@ -14,7 +14,7 @@ def uniform(suite: str, function: int, n: int, d: int) -> np.ndarray:
     return (np.random.PCG64(seed).random_raw((n, d)) >> 11) * 2.0**-53
 
 
-GNBG = {"gnbg_ii": (gnbg_ii, 24), "gnbg_iii": (gnbg_iii, 22)}
+GNBG = {"gnbg_i": (gnbg_i, 24), "gnbg_ii": (gnbg_ii, 24), "gnbg_iii": (gnbg_iii, 22)}
 
 
 @pytest.fixture(scope="module", params=list(GNBG))
