@@ -49,7 +49,7 @@ def lon() -> None:
     _not_implemented("lon")
 
 
-class Suite(str, enum.Enum):
+class Suite(enum.StrEnum):
     bbob = "bbob"
     ma_bbob = "ma_bbob"
     gnbg_i = "gnbg_i"
