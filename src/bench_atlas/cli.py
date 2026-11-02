@@ -57,7 +57,7 @@ def ela(
         [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
     ),
     points_per_dimension: int = typer.Option(
-        50, "--points-per-dimension", "-n", help="Sample size per dimension."
+        50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
     ),
 ) -> None:
     """Compute ELA features.

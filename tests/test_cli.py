@@ -58,6 +58,11 @@ def test_ela_instances() -> None:
     assert set(table["problem"].str.split("_").str[2]) == {"i3"}
 
 
+def test_ela_rejects_empty_sample() -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "0"])
+    assert result.exit_code == 2
+
+
 def test_core_dependencies_import() -> None:
     import ioh  # noqa: F401
     import joblib  # noqa: F401
