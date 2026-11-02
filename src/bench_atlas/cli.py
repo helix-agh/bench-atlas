@@ -53,23 +53,32 @@ def ela(
     dimension: list[int] = typer.Option(
         [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
     ),
+    instance: list[int] = typer.Option(
+        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    points_per_dimension: int = typer.Option(
+        50, "--points-per-dimension", "-n", help="Sample size per dimension."
+    ),
 ) -> None:
     """Compute ELA features.
 
     Prints CSV: one row per problem and sample seed (0-9) with ``f_med`` and all
-    orivex features. BBOB and MA-BBOB use instances 1-5; GNBG suites have a
-    fixed d = 30 and one instance.
+    orivex features. GNBG suites have a fixed d = 30 and one instance.
     """
     rows = []
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob):
-            problems = getattr(suites, name.value)(dimension, range(1, 6))
+            problems = getattr(suites, name.value)(dimension, instance)
         else:
             problems = getattr(suites, name.value)()
         for problem in problems:
             for seed in range(10):
                 rows.append(
-                    {"problem": str(problem.id), "seed": seed, **ela_features(problem, seed)}
+                    {
+                        "problem": str(problem.id),
+                        "seed": seed,
+                        **ela_features(problem, seed, points_per_dimension),
+                    }
                 )
     typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
 

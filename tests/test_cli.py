@@ -43,12 +43,19 @@ def test_timing() -> None:
 
 
 def test_ela_on_bbob() -> None:
-    result = runner.invoke(app, ["ela", "bbob", "-d", "2"])
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "30"])
     assert result.exit_code == 0
     table = pd.read_csv(io.StringIO(result.stdout))
     assert len(table) == 24 * 5 * 10
     assert table["problem"].iloc[0] == "bbob_f1_i1_d2"
     assert not table.isna().any().any()
+
+
+def test_ela_instances() -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-i", "3"])
+    assert result.exit_code == 0
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert set(table["problem"].str.split("_").str[2]) == {"i3"}
 
 
 def test_core_dependencies_import() -> None:
