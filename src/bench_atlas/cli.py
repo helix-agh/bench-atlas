@@ -2,9 +2,11 @@
 
 import enum
 
+import pandas as pd
 import typer
 
 from bench_atlas import __version__, suites
+from bench_atlas.ela import ela_features
 
 app = typer.Typer(
     name="bench-atlas",
@@ -37,24 +39,54 @@ def main(
     """Analyse and compare continuous black-box optimization benchmarks."""
 
 
-@app.command()
-def ela() -> None:
-    """Compute ELA features."""
-    _not_implemented("ela")
-
-
-@app.command()
-def lon() -> None:
-    """Build local optima networks and compute LON metrics."""
-    _not_implemented("lon")
-
-
 class Suite(enum.StrEnum):
     bbob = "bbob"
     ma_bbob = "ma_bbob"
     gnbg_i = "gnbg_i"
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
+
+
+@app.command()
+def ela(
+    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
+    dimension: list[int] = typer.Option(
+        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+    instance: list[int] = typer.Option(
+        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    points_per_dimension: int = typer.Option(
+        50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
+    ),
+) -> None:
+    """Compute ELA features.
+
+    Prints CSV: one row per problem and sample seed (0-9) with ``f_med`` and all
+    orivex features. GNBG suites have a fixed d = 30 and one instance.
+    """
+    rows = []
+    for name in suite:
+        if name in (Suite.bbob, Suite.ma_bbob):
+            problems = getattr(suites, name.value)(dimension, instance)
+        else:
+            problems = getattr(suites, name.value)()
+        for problem in problems:
+            for seed in range(10):
+                rows.append(
+                    {
+                        "problem": str(problem.id),
+                        "seed": seed,
+                        **ela_features(problem, seed, points_per_dimension),
+                    }
+                )
+    typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
+
+
+@app.command()
+def lon() -> None:
+    """Build local optima networks and compute LON metrics."""
+    _not_implemented("lon")
 
 
 @app.command()
