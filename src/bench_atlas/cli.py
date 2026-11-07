@@ -66,6 +66,7 @@ class Suite(enum.StrEnum):
     iohclustering = "iohclustering"
     zigzag = "zigzag"
     cec2022 = "cec2022"
+    dispersion = "dispersion"
 
 
 # The atlas problem set: every command defaults to it, so features join per problem.
@@ -128,7 +129,8 @@ def ela(
     sample, so differences between problems are not sampling noise, and raising
     ``--replicates`` computes only the new ones. Rows hold the problem id,
     ``replicate``, ``seed``, ``points_per_dimension``, library versions, ``f_med``
-    and all orivex features. GNBG suites have a fixed d = 30 and one instance.
+    and all orivex features. GNBG suites have a fixed d = 30 and one instance; the
+    dispersion suite has fixed d = 2, 4, 6 and one instance.
 
     Stored rows are reused by problem, seed and settings only, not by the version
     of the analysis code: after changing the code, use a fresh ``--results`` folder
@@ -246,7 +248,8 @@ def lon(
     another precision reuses the runs. Prints the requested ``lon`` rows as CSV: the
     problem id, ``replicate``, ``global_seed``, ``seed``, the settings, library versions, the
     evaluations used, the number of runs, the lonkit CMLON metrics and ``cmlon``, the
-    graph name. GNBG suites have a fixed d = 30 and one instance.
+    graph name. GNBG suites have a fixed d = 30 and one instance; the dispersion
+    suite has fixed d = 2, 4, 6 and one instance.
 
     By default only d <= 10 and instance 1 (the LON atlas): LON is too expensive
     for the larger dimensions of the other analyses.
@@ -285,7 +288,8 @@ def timing(
     Adds one row per problem and batch size to ``<results>/timing.parquet``,
     skipping rows that are already there, and prints the requested rows as CSV.
     ``time_us`` is the median evaluation time per point in microseconds. BBOB and
-    MA-BBOB use instance 1; GNBG suites have a fixed d = 30.
+    MA-BBOB use instance 1; GNBG suites have a fixed d = 30 and the dispersion
+    suite fixed d = 2, 4, 6.
 
     Timings depend on the machine and on the load: with many parallel jobs the
     CPU runs at a lower all-core clock (about 3 % slower for a short run on a
