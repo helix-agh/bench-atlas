@@ -25,6 +25,13 @@ def test_sphere_has_one_funnel() -> None:
     assert features["success"] == 1
 
 
+@pytest.mark.parametrize("function", [2, 8])
+def test_unimodal_bbob_has_one_funnel(function: int) -> None:
+    features = lon_features(bbob([2], [1])[function - 1], 0, **SMALL)
+    assert features["n_funnels"] == 1
+    assert features["success"] == 1
+
+
 def test_budget_limits_evaluations_and_runs() -> None:
     problem = bbob([2], [1])[14]
     with warnings.catch_warnings(record=True) as caught:

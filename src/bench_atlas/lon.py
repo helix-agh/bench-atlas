@@ -15,6 +15,8 @@ __all__ = ["cmlon", "lon_features"]
 STEP_SIZE = 0.1
 N_RUNS = 100
 N_ITER_NO_CHANGE = 250
+COORDINATE_PRECISION = 4
+FITNESS_PRECISION = 4
 BUDGET_PER_DIMENSION = 10_000_000
 
 _BUDGET_EXHAUSTED = "evaluation budget exhausted"
@@ -58,8 +60,13 @@ def cmlon(
     non-improving perturbations. At most ``budget_per_dimension * d`` points are
     evaluated: once the budget is spent, the current run stops and the remaining
     runs are skipped. Runs are sequential, so the result depends only on ``seed``.
-    Optima are identified by coordinates rounded to 5 decimals; their fitness is the
-    minimum over the merged points (lonkit's default, without its warning).
+
+    Optima are identified by coordinates rounded to ``COORDINATE_PRECISION``
+    decimals and compared by fitness rounded to ``FITNESS_PRECISION`` decimals.
+    L-BFGS-B stops a little short of an optimum, so with lonkit's defaults (5
+    decimals, full fitness precision) runs that end in the same basin become
+    separate optima and funnels. A merged optimum takes the minimum fitness of its
+    points (lonkit's default, without its warning).
     """
     d = problem.dimension
     objective = _PointObjective(problem, problem.evaluations + budget_per_dimension * d)
@@ -69,6 +76,8 @@ def cmlon(
             n_iter_no_change=n_iter_no_change,
             step_mode="fixed",
             step_size=STEP_SIZE,
+            coordinate_precision=COORDINATE_PRECISION,
+            fitness_precision=FITNESS_PRECISION,
             minimizer_method="L-BFGS-B",
             seed=seed,
             n_jobs=1,
