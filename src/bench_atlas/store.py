@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import socket
 import warnings
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -65,11 +65,11 @@ def save(results: Path, analysis: str, table: pd.DataFrame) -> None:
 
 
 @contextmanager
-def lock(results: Path, analysis: str) -> Iterator[None]:
+def lock(results: Path, analysis: str) -> Generator[None, None, None]:
     """Hold the lock of the ``analysis`` table for the duration of the block.
 
     The lock is a file created exclusively next to the table (``flock`` is not used:
-    Lustre supports it only with a mount option). It holds the host and process id of
+    file systems on HPC clusters may not support it). It holds the host and process id of
     its owner and is removed on exit, including on exceptions.
 
     Raises:

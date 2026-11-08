@@ -14,7 +14,7 @@ import hashlib
 import signal
 import threading
 import time
-from collections.abc import Callable, Iterable, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
 from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -187,7 +187,7 @@ def _table_keys(table: pd.DataFrame, params: Mapping[str, Any]) -> Iterator[tupl
 
 
 @contextmanager
-def _sigterm_as_exit() -> Iterator[None]:
+def _sigterm_as_exit() -> Generator[None, None, None]:
     """Turn SIGTERM (e.g. a Slurm time limit) into ``SystemExit``, so rows get saved."""
     if threading.current_thread() is not threading.main_thread():
         yield
