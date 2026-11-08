@@ -12,8 +12,8 @@ import pandas as pd
 import typer
 
 from bench_atlas import __version__, executor, store, suites
+from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
-from bench_atlas.lon import BUDGET_PER_DIMENSION, N_ITER_NO_CHANGE, N_RUNS, lon_features
 from bench_atlas.problems import Problem
 from bench_atlas.timing import timing_features
 
@@ -160,44 +160,63 @@ def lon(
     instance: list[int] = typer.Option(
         [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
     ),
-    seed: list[int] = typer.Option([0], "--seed", "-s", help="Sampling seeds."),
-    runs: int = typer.Option(N_RUNS, "--runs", "-r", min=1, help="Basin-hopping runs."),
+    replicates: int = typer.Option(
+        1, "--replicates", min=1, help="Basin-hopping samples per problem."
+    ),
+    runs: int = typer.Option(lon_module.N_RUNS, "--runs", "-r", min=1, help="Basin-hopping runs."),
     iter_no_change: int = typer.Option(
-        N_ITER_NO_CHANGE,
+        lon_module.N_ITER_NO_CHANGE,
         "--iter-no-change",
         min=1,
         help="Non-improving perturbations that stop a run.",
     ),
     budget_per_dimension: int = typer.Option(
-        BUDGET_PER_DIMENSION,
+        lon_module.BUDGET_PER_DIMENSION,
         "--budget-per-dimension",
         "-B",
         min=1,
         help="Evaluation budget per dimension.",
     ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the sampling seeds."),
 ) -> None:
     """Build local optima networks and compute LON metrics.
 
-    Prints CSV: one row per problem and seed with the evaluations used, the
-    number of runs within the budget and the lonkit CMLON metrics. GNBG suites
-    have a fixed d = 30 and one instance.
+    Adds one row per problem and replicate to ``<results>/lon.parquet``, skipping
+    rows that are already there, and prints the requested rows as CSV. Rows hold
+    the problem id, ``replicate``, ``seed``, the sampler settings, library
+    versions, the evaluations used, the number of runs within the budget and the
+    lonkit CMLON metrics. One task is one problem, so ``--jobs`` parallelizes
+    across problems. GNBG suites have a fixed d = 30 and one instance.
     """
-    rows = []
-    for name in suite:
-        if name in (Suite.bbob, Suite.ma_bbob):
-            problems = getattr(suites, name.value)(dimension, instance)
-        else:
-            problems = getattr(suites, name.value)()
-        for problem in problems:
-            for s in seed:
-                rows.append(
-                    {
-                        "problem": str(problem.id),
-                        "seed": s,
-                        **lon_features(problem, s, budget_per_dimension, runs, iter_no_change),
-                    }
-                )
-    typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
+    table = _run(
+        "lon",
+        _problems(suite, dimension, instance),
+        range(replicates),
+        functools.partial(
+            lon_module.lon_features,
+            budget_per_dimension=budget_per_dimension,
+            n_runs=runs,
+            n_iter_no_change=iter_no_change,
+        ),
+        {
+            "budget_per_dimension": budget_per_dimension,
+            "runs": runs,
+            "iter_no_change": iter_no_change,
+            "step_size": lon_module.STEP_SIZE,
+            "coordinate_precision": lon_module.COORDINATE_PRECISION,
+            "fitness_precision": lon_module.FITNESS_PRECISION,
+        },
+        results,
+        jobs,
+        seed,
+    )
+    typer.echo(table.to_csv(index=False), nl=False)
 
 
 @app.command()
