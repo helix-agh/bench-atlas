@@ -26,7 +26,7 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "timing")])
+@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "lon", "timing")])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
@@ -140,6 +140,31 @@ def test_ela_seed_changes_samples(tmp_path: Path) -> None:
     ]
     assert not seeds[0].isin(seeds[1]).any()
     assert len(pd.read_parquet(tmp_path / "ela.parquet")) == 2 * 24 * 10
+
+
+def test_lon_on_bbob() -> None:
+    result = runner.invoke(app, ["lon", "bbob", "-d", "2", "-r", "2", "--iter-no-change", "5"])
+    assert result.exit_code == 0
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24
+    assert list(table.columns[:4]) == ["problem", "seed", "evaluations", "n_runs"]
+    assert table["problem"].iloc[0] == "bbob_f1_i1_d2"
+    assert (table["n_runs"] == 2).all()
+    assert not table.isna().any().any()
+
+
+def test_lon_seeds_and_budget() -> None:
+    args = ["lon", "bbob", "-d", "2", "-s", "0", "-s", "1", "-r", "50", "-B", "100"]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 2
+    assert (table["evaluations"] <= 100 * 2).all()
+
+
+def test_lon_rejects_zero_budget() -> None:
+    result = runner.invoke(app, ["lon", "bbob", "-d", "2", "-B", "0"])
+    assert result.exit_code == 2
 
 
 def test_core_dependencies_import() -> None:

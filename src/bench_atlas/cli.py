@@ -13,6 +13,7 @@ import typer
 
 from bench_atlas import __version__, executor, store, suites
 from bench_atlas.ela import ela_features
+from bench_atlas.lon import BUDGET_PER_DIMENSION, N_ITER_NO_CHANGE, N_RUNS, lon_features
 from bench_atlas.problems import Problem
 from bench_atlas.timing import timing_features
 
@@ -151,9 +152,52 @@ def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> 
 
 
 @app.command()
-def lon() -> None:
-    """Build local optima networks and compute LON metrics."""
-    _not_implemented("lon")
+def lon(
+    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
+    dimension: list[int] = typer.Option(
+        [2, 5], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+    instance: list[int] = typer.Option(
+        [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    seed: list[int] = typer.Option([0], "--seed", "-s", help="Sampling seeds."),
+    runs: int = typer.Option(N_RUNS, "--runs", "-r", min=1, help="Basin-hopping runs."),
+    iter_no_change: int = typer.Option(
+        N_ITER_NO_CHANGE,
+        "--iter-no-change",
+        min=1,
+        help="Non-improving perturbations that stop a run.",
+    ),
+    budget_per_dimension: int = typer.Option(
+        BUDGET_PER_DIMENSION,
+        "--budget-per-dimension",
+        "-B",
+        min=1,
+        help="Evaluation budget per dimension.",
+    ),
+) -> None:
+    """Build local optima networks and compute LON metrics.
+
+    Prints CSV: one row per problem and seed with the evaluations used, the
+    number of runs within the budget and the lonkit CMLON metrics. GNBG suites
+    have a fixed d = 30 and one instance.
+    """
+    rows = []
+    for name in suite:
+        if name in (Suite.bbob, Suite.ma_bbob):
+            problems = getattr(suites, name.value)(dimension, instance)
+        else:
+            problems = getattr(suites, name.value)()
+        for problem in problems:
+            for s in seed:
+                rows.append(
+                    {
+                        "problem": str(problem.id),
+                        "seed": s,
+                        **lon_features(problem, s, budget_per_dimension, runs, iter_no_change),
+                    }
+                )
+    typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
 
 
 @app.command()
