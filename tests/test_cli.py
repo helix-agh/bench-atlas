@@ -33,14 +33,30 @@ def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     assert "not implemented" in result.output
 
 
-def test_timing() -> None:
-    result = runner.invoke(app, ["timing", "bbob", "-d", "2", "-b", "1", "-b", "10"])
+def test_timing(tmp_path: Path) -> None:
+    args = ["timing", "bbob", "-d", "2", "-b", "1", "-b", "10", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
     assert result.exit_code == 0
-    lines = result.stdout.splitlines()
-    assert lines[0] == "problem,batch_size,time_us"
-    assert len(lines) == 1 + 24 * 2
-    assert lines[1].startswith("bbob_f1_i1_d2,1,")
-    assert lines[2].startswith("bbob_f1_i1_d2,10,")
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 2
+    assert list(table["problem"][:3]) == ["bbob_f1_i1_d2", "bbob_f1_i1_d2", "bbob_f2_i1_d2"]
+    assert list(table["batch_size"][:3]) == [1, 10, 1]
+    assert (table["time_us"] > 0).all()
+    assert (table["n_jobs"] == 1).all()
+    assert table["host"].nunique() == 1
+    assert len(pd.read_parquet(tmp_path / "timing.parquet")) == 24 * 2
+
+
+def test_timing_cache_separates_job_counts(tmp_path: Path) -> None:
+    args = ["timing", "bbob", "-d", "2", "-o", str(tmp_path)]
+    first = runner.invoke(app, args)
+    again = runner.invoke(app, args)
+    assert "24 cached, 0 to compute" in again.stderr
+    assert again.stdout == first.stdout
+    parallel = runner.invoke(app, [*args, "-j", "2"])
+    assert parallel.exit_code == 0
+    assert "0 cached, 24 to compute" in parallel.stderr
+    assert len(pd.read_parquet(tmp_path / "timing.parquet")) == 24 * 2
 
 
 def test_ela_on_bbob(tmp_path: Path) -> None:

@@ -9,21 +9,29 @@ from threadpoolctl import threadpool_limits
 
 from bench_atlas.problems import Problem
 
-__all__ = ["evaluation_time"]
+__all__ = ["evaluation_time", "timing_features"]
 
 WARMUP = 10
 MIN_BATCHES = 10
 
 
-def evaluation_time(problem: Problem, batch_size: int = 1, n_points: int = 1000) -> float:
+def timing_features(problem: Problem, seed: int, batch_size: int = 1) -> dict[str, float]:
+    """``time_us``: :func:`evaluation_time` per point in microseconds."""
+    return {"time_us": evaluation_time(problem, batch_size=batch_size, seed=seed) * 1e6}
+
+
+def evaluation_time(
+    problem: Problem, batch_size: int = 1, n_points: int = 1000, seed: int = 0
+) -> float:
     """Median wall time in seconds per point when evaluating batches of ``batch_size``.
 
     Times ``max(MIN_BATCHES, n_points // batch_size)`` batches of uniform random
     points on [0, 1]^d, after ``WARMUP`` untimed batches, and divides the median
     batch time by ``batch_size``. BLAS / OpenMP thread pools are limited to one
-    thread. The points come from a fixed seed, so every call times the same points.
+    thread. The points come from ``seed``, so calls with the same seed time the
+    same points.
     """
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
     n_batches = max(MIN_BATCHES, n_points // batch_size)
     times = np.empty(n_batches)
     with threadpool_limits(limits=1):

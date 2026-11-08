@@ -2,13 +2,19 @@
 
 import enum
 import functools
+import socket
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
+import joblib
+import pandas as pd
 import typer
 
 from bench_atlas import __version__, executor, store, suites
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
+from bench_atlas.timing import timing_features
 
 app = typer.Typer(
     name="bench-atlas",
@@ -87,13 +93,37 @@ def ela(
     ``points_per_dimension``, library versions, ``f_med`` and all orivex
     features. GNBG suites have a fixed d = 30 and one instance.
     """
+    table = _run(
+        "ela",
+        _problems(suite, dimension, instance),
+        range(ELA_REPLICATES),
+        functools.partial(ela_features, points_per_dimension=points_per_dimension),
+        {"points_per_dimension": points_per_dimension},
+        results,
+        jobs,
+        seed,
+    )
+    typer.echo(table.to_csv(index=False), nl=False)
+
+
+def _run(
+    analysis: str,
+    problems: list[Problem],
+    replicates: Iterable[int],
+    compute: Callable[[Problem, int], Mapping[str, Any]],
+    params: Mapping[str, Any],
+    results: Path,
+    jobs: int,
+    seed: int = 0,
+) -> pd.DataFrame:
+    """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
     try:
-        table = executor.run(
-            "ela",
-            _problems(suite, dimension, instance),
-            range(ELA_REPLICATES),
-            functools.partial(ela_features, points_per_dimension=points_per_dimension),
-            {"points_per_dimension": points_per_dimension},
+        return executor.run(
+            analysis,
+            problems,
+            replicates,
+            compute,
+            params,
             results,
             n_jobs=jobs,
             global_seed=seed,
@@ -102,7 +132,6 @@ def ela(
     except store.LockedError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
-    typer.echo(table.to_csv(index=False), nl=False)
 
 
 def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> list[Problem]:
@@ -131,25 +160,45 @@ def timing(
     batch_size: list[int] = typer.Option(
         [1], "--batch-size", "-b", min=1, help="Points evaluated per call."
     ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
 ) -> None:
     """Measure evaluation cost of benchmark problems.
 
-    Prints CSV: problem id, batch size and the median evaluation time per point
-    in microseconds. BBOB and MA-BBOB use instance 1; GNBG suites have a fixed
-    d = 30.
-    """
-    from bench_atlas.timing import evaluation_time
+    Adds one row per problem and batch size to ``<results>/timing.parquet``,
+    skipping rows that are already there, and prints the requested rows as CSV.
+    ``time_us`` is the median evaluation time per point in microseconds. BBOB and
+    MA-BBOB use instance 1; GNBG suites have a fixed d = 30.
 
-    typer.echo("problem,batch_size,time_us")
-    for name in suite:
-        if name in (Suite.bbob, Suite.ma_bbob):
-            problems = getattr(suites, name.value)(dimension, [1])
-        else:
-            problems = getattr(suites, name.value)()
-        for problem in problems:
-            for size in batch_size:
-                time_us = evaluation_time(problem, batch_size=size) * 1e6
-                typer.echo(f"{problem.id},{size},{time_us:.4g}")
+    Timings depend on the machine and on the load: with many parallel jobs the
+    CPU runs at a lower all-core clock (about 3 % slower for a short run on a
+    112-core node, about 11 % under sustained full load). The host and the
+    effective number of jobs are therefore part of every row and of the cache
+    key, so timings measured under different conditions are never mixed.
+    """
+    problems = _problems(suite, dimension, [1])
+    params = {"n_jobs": joblib.effective_n_jobs(jobs), "host": socket.gethostname()}
+    tables = [
+        _run(
+            "timing",
+            problems,
+            [0],
+            functools.partial(timing_features, batch_size=size),
+            {"batch_size": size, **params},
+            results,
+            jobs,
+        )
+        for size in batch_size
+    ]
+    order = {str(problem.id): i for i, problem in enumerate(problems)}
+    table = pd.concat(tables, ignore_index=True).sort_values(
+        "problem", key=lambda column: column.map(order), kind="stable"
+    )
+    typer.echo(table.to_csv(index=False), nl=False)
 
 
 @app.command()
