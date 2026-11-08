@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -42,8 +43,8 @@ def test_timing() -> None:
     assert lines[2].startswith("bbob_f1_i1_d2,10,")
 
 
-def test_ela_on_bbob() -> None:
-    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "30"])
+def test_ela_on_bbob(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "30", "-o", str(tmp_path)])
     assert result.exit_code == 0
     table = pd.read_csv(io.StringIO(result.stdout))
     assert len(table) == 24 * 5 * 10
@@ -51,16 +52,47 @@ def test_ela_on_bbob() -> None:
     assert not table.isna().any().any()
 
 
-def test_ela_instances() -> None:
-    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-i", "3"])
+def test_ela_instances(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-i", "3", "-o", str(tmp_path)])
     assert result.exit_code == 0
     table = pd.read_csv(io.StringIO(result.stdout))
     assert set(table["problem"].str.split("_").str[2]) == {"i3"}
 
 
-def test_ela_rejects_empty_sample() -> None:
-    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "0"])
+def test_ela_rejects_empty_sample(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "0", "-o", str(tmp_path)])
     assert result.exit_code == 2
+    assert not any(tmp_path.iterdir())
+
+
+def test_ela_rejects_zero_jobs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-j", "0", "-o", str(tmp_path)])
+    assert result.exit_code == 2
+
+
+def test_ela_stores_and_reuses_results(tmp_path: Path) -> None:
+    args = ["ela", "bbob", "-d", "2", "-i", "1", "-n", "10", "-o", str(tmp_path)]
+    first = runner.invoke(app, args)
+    assert first.exit_code == 0
+    stored = pd.read_parquet(tmp_path / "ela.parquet")
+    assert len(stored) == 24 * 10
+    again = runner.invoke(app, args)
+    assert again.exit_code == 0
+    assert "240 cached, 0 to compute" in again.stderr
+    assert again.stdout == first.stdout
+    parallel = runner.invoke(app, [*args[:-1], str(tmp_path / "parallel"), "-j", "2"])
+    assert parallel.exit_code == 0
+    assert parallel.stdout == first.stdout
+
+
+def test_ela_seed_changes_samples(tmp_path: Path) -> None:
+    base = ["ela", "bbob", "-d", "2", "-i", "1", "-n", "10", "-o", str(tmp_path)]
+    seeds = [
+        pd.read_csv(io.StringIO(runner.invoke(app, [*base, "-s", s]).stdout))["seed"]
+        for s in ("0", "1")
+    ]
+    assert not seeds[0].isin(seeds[1]).any()
+    assert len(pd.read_parquet(tmp_path / "ela.parquet")) == 2 * 24 * 10
 
 
 def test_core_dependencies_import() -> None:

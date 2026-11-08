@@ -1,12 +1,14 @@
 """Command-line interface for bench-atlas."""
 
 import enum
+import functools
+from pathlib import Path
 
-import pandas as pd
 import typer
 
-from bench_atlas import __version__, suites
+from bench_atlas import __version__, executor, suites
 from bench_atlas.ela import ela_features
+from bench_atlas.problems import Problem
 
 app = typer.Typer(
     name="bench-atlas",
@@ -39,6 +41,15 @@ def main(
     """Analyse and compare continuous black-box optimization benchmarks."""
 
 
+ELA_REPLICATES = 10
+
+
+def _check_jobs(value: int) -> int:
+    if value == 0:
+        raise typer.BadParameter("0 is not a valid number of jobs.")
+    return value
+
+
 class Suite(enum.StrEnum):
     bbob = "bbob"
     ma_bbob = "ma_bbob"
@@ -59,28 +70,46 @@ def ela(
     points_per_dimension: int = typer.Option(
         50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
     ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the sample seeds."),
 ) -> None:
     """Compute ELA features.
 
-    Prints CSV: one row per problem and sample seed (0-9) with ``f_med`` and all
-    orivex features. GNBG suites have a fixed d = 30 and one instance.
+    Adds one row per problem and replicate (0-9) to ``<results>/ela.parquet``,
+    skipping rows that are already there, and prints the requested rows as CSV.
+    Each replicate's Sobol sample seed is derived from ``--seed``, the problem id
+    and the replicate. Rows hold the problem id, ``replicate``, ``seed``,
+    ``points_per_dimension``, library versions, ``f_med`` and all orivex
+    features. GNBG suites have a fixed d = 30 and one instance.
     """
-    rows = []
+    table = executor.run(
+        "ela",
+        _problems(suite, dimension, instance),
+        range(ELA_REPLICATES),
+        functools.partial(ela_features, points_per_dimension=points_per_dimension),
+        {"points_per_dimension": points_per_dimension},
+        results,
+        n_jobs=jobs,
+        global_seed=seed,
+        log=functools.partial(typer.echo, err=True),
+    )
+    typer.echo(table.to_csv(index=False), nl=False)
+
+
+def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> list[Problem]:
+    """Problems of the suites; GNBG suites ignore dimensions and instances."""
+    problems = []
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob):
-            problems = getattr(suites, name.value)(dimension, instance)
+            problems += getattr(suites, name.value)(dimension, instance)
         else:
-            problems = getattr(suites, name.value)()
-        for problem in problems:
-            for seed in range(10):
-                rows.append(
-                    {
-                        "problem": str(problem.id),
-                        "seed": seed,
-                        **ela_features(problem, seed, points_per_dimension),
-                    }
-                )
-    typer.echo(pd.DataFrame(rows).to_csv(index=False), nl=False)
+            problems += getattr(suites, name.value)()
+    return problems
 
 
 @app.command()
