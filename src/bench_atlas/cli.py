@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from bench_atlas import __version__, executor, suites
+from bench_atlas import __version__, executor, store, suites
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
 
@@ -87,17 +87,21 @@ def ela(
     ``points_per_dimension``, library versions, ``f_med`` and all orivex
     features. GNBG suites have a fixed d = 30 and one instance.
     """
-    table = executor.run(
-        "ela",
-        _problems(suite, dimension, instance),
-        range(ELA_REPLICATES),
-        functools.partial(ela_features, points_per_dimension=points_per_dimension),
-        {"points_per_dimension": points_per_dimension},
-        results,
-        n_jobs=jobs,
-        global_seed=seed,
-        log=functools.partial(typer.echo, err=True),
-    )
+    try:
+        table = executor.run(
+            "ela",
+            _problems(suite, dimension, instance),
+            range(ELA_REPLICATES),
+            functools.partial(ela_features, points_per_dimension=points_per_dimension),
+            {"points_per_dimension": points_per_dimension},
+            results,
+            n_jobs=jobs,
+            global_seed=seed,
+            log=functools.partial(typer.echo, err=True),
+        )
+    except store.LockedError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from None
     typer.echo(table.to_csv(index=False), nl=False)
 
 

@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 from typer.testing import CliRunner
 
-from bench_atlas import __version__
+from bench_atlas import __version__, store
 from bench_atlas.cli import app
 
 runner = CliRunner()
@@ -83,6 +83,14 @@ def test_ela_stores_and_reuses_results(tmp_path: Path) -> None:
     parallel = runner.invoke(app, [*args[:-1], str(tmp_path / "parallel"), "-j", "2"])
     assert parallel.exit_code == 0
     assert parallel.stdout == first.stdout
+
+
+def test_ela_refuses_a_locked_table(tmp_path: Path) -> None:
+    with store.lock(tmp_path, "ela"):
+        result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "ela.parquet.lock is held by" in result.stderr
+    assert "Traceback" not in result.output
 
 
 def test_ela_seed_changes_samples(tmp_path: Path) -> None:
