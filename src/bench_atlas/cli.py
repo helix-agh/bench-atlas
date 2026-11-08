@@ -155,7 +155,7 @@ def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> 
 def lon(
     suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
     dimension: list[int] = typer.Option(
-        [2, 5], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+        [2, 5, 10], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
     ),
     instance: list[int] = typer.Option(
         [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
