@@ -168,3 +168,22 @@ def test_results_do_not_depend_on_n_jobs(tmp_path: Path) -> None:
         for n_jobs in (1, 4)
     )
     pd.testing.assert_frame_equal(serial, parallel, check_exact=True)
+
+
+def test_task_seed_of_runs() -> None:
+    problem_id = ProblemId("bbob", 1, 1, 2)
+    assert executor.task_seed(0, problem_id, 0, None) == executor.task_seed(0, problem_id, 0)
+    seeds = [executor.task_seed(0, problem_id, r, run) for r in range(2) for run in range(50)]
+    assert len(set(seeds)) == 100
+    assert executor.task_seed(0, problem_id, 0) not in seeds
+
+
+def test_runs_are_separate_tasks(tmp_path: Path) -> None:
+    messages: list[str] = []
+    table = _run(tmp_path, runs=3, log=messages.append)
+    assert messages[0] == "test: 0 cached, 18 to compute"
+    assert list(table["run"][:4]) == [0, 1, 2, 0]
+    assert list(table["replicate"][:4]) == [0, 0, 0, 1]
+    assert table["seed"].nunique() == 18
+    again = _run(tmp_path, _FailOn(set(table["seed"])), runs=3)
+    pd.testing.assert_frame_equal(table, again)

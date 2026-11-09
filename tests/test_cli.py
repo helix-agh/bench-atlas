@@ -146,26 +146,40 @@ def test_lon_on_bbob(tmp_path: Path) -> None:
     args = ["lon", "bbob", "-d", "2", "-r", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
     result = runner.invoke(app, args)
     assert result.exit_code == 0
+    assert "lon_runs: 0 cached, 48 to compute" in result.stderr
     table = pd.read_csv(io.StringIO(result.stdout))
     assert len(table) == 24
     assert table["problem"].iloc[0] == "bbob_f1_i1_d2"
     assert (table["n_runs"] == 2).all()
-    assert (table["fitness_precision"] == 4).all()
-    assert not table.isna().any().any()
+    assert (table["coordinate_precision"] == 4).all()
+    assert not table.drop(columns="cmlon").isna().any().any()
+    assert len(pd.read_parquet(tmp_path / "lon_runs.parquet")) == 48
     assert len(pd.read_parquet(tmp_path / "lon.parquet")) == 24
+    assert store.load_cmlon(tmp_path, table["cmlon"].iloc[0]).n_vertices >= 1
     again = runner.invoke(app, args)
-    assert "24 cached, 0 to compute" in again.stderr
+    assert "lon_runs: 48 cached, 0 to compute" in again.stderr
+    assert "lon: 24 cached, 0 to compute" in again.stderr
     assert again.stdout == result.stdout
 
 
+def test_lon_other_precision_reuses_the_runs(tmp_path: Path) -> None:
+    args = ["lon", "bbob", "-d", "2", "-r", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
+    runner.invoke(app, args)
+    result = runner.invoke(app, [*args, "--coordinate-precision", "2"])
+    assert result.exit_code == 0
+    assert "lon_runs: 48 cached, 0 to compute" in result.stderr
+    assert "lon: 0 cached, 24 to compute" in result.stderr
+    assert len(list((tmp_path / "cmlon").glob("*.graphml"))) == 48
+
+
 def test_lon_replicates_budget_and_jobs(tmp_path: Path) -> None:
-    base = ["lon", "bbob", "-d", "2", "--replicates", "2", "-r", "50", "-B", "100"]
+    base = ["lon", "bbob", "-d", "2", "--replicates", "2", "-r", "3", "-B", "100"]
     serial = runner.invoke(app, [*base, "-o", str(tmp_path / "serial")])
     assert serial.exit_code == 0
     table = pd.read_csv(io.StringIO(serial.stdout))
     assert len(table) == 24 * 2
     assert list(table["replicate"][:2]) == [0, 1]
-    assert (table["evaluations"] <= 100 * 2).all()
+    assert (table["evaluations"] <= 3 * 100 * 2).all()
     parallel = runner.invoke(app, [*base, "-o", str(tmp_path / "parallel"), "-j", "2"])
     assert parallel.stdout == serial.stdout
 

@@ -3,7 +3,8 @@
 import enum
 import functools
 import socket
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,7 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, store, suites
+from bench_atlas import __version__, executor, lon_pipeline, store, suites
 from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
@@ -123,7 +124,7 @@ def _run(
     seed: int = 0,
 ) -> pd.DataFrame:
     """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
-    try:
+    with _report_locked():
         return executor.run(
             analysis,
             problems,
@@ -135,6 +136,13 @@ def _run(
             global_seed=seed,
             log=functools.partial(typer.echo, err=True),
         )
+
+
+@contextmanager
+def _report_locked() -> Generator[None, None, None]:
+    """Turn :class:`store.LockedError` into a one-line message and exit code 1."""
+    try:
+        yield
     except store.LockedError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
@@ -170,12 +178,24 @@ def lon(
         min=1,
         help="Non-improving perturbations that stop a run.",
     ),
-    budget_per_dimension: int = typer.Option(
-        lon_module.BUDGET_PER_DIMENSION,
-        "--budget-per-dimension",
+    run_budget_per_dimension: int = typer.Option(
+        lon_module.RUN_BUDGET_PER_DIMENSION,
+        "--run-budget-per-dimension",
         "-B",
         min=1,
-        help="Evaluation budget per dimension.",
+        help="Evaluation budget of one run, per dimension.",
+    ),
+    coordinate_precision: int = typer.Option(
+        lon_module.COORDINATE_PRECISION,
+        "--coordinate-precision",
+        min=0,
+        help="Decimals of the coordinates that identify an optimum.",
+    ),
+    fitness_precision: int = typer.Option(
+        lon_module.FITNESS_PRECISION,
+        "--fitness-precision",
+        min=0,
+        help="Decimals of the fitness of an optimum.",
     ),
     results: Path = typer.Option(
         Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
@@ -187,35 +207,33 @@ def lon(
 ) -> None:
     """Build local optima networks and compute LON metrics.
 
-    Adds one row per problem and replicate to ``<results>/lon.parquet``, skipping
-    rows that are already there, and prints the requested rows as CSV. Rows hold
-    the problem id, ``replicate``, ``seed``, the sampler settings, library
-    versions, the evaluations used, the number of runs within the budget and the
-    lonkit CMLON metrics. One task is one problem, so ``--jobs`` parallelizes
-    across problems. GNBG suites have a fixed d = 30 and one instance.
+    Every basin-hopping run is its own task, stored in ``<results>/lon_runs.parquet``
+    with the full-precision optima it accepted, so ``--jobs`` spreads the runs of all
+    problems over the workers. Then, for each problem and replicate, the CMLON is
+    built at the requested precision, saved to ``<results>/cmlon/`` and its metrics
+    are added to ``<results>/lon.parquet``; stored runs and rows are skipped, so
+    another precision reuses the runs. Prints the requested ``lon`` rows as CSV: the
+    problem id, ``replicate``, ``seed``, the settings, library versions, the
+    evaluations used, the number of runs, the lonkit CMLON metrics and ``cmlon``, the
+    graph name. GNBG suites have a fixed d = 30 and one instance.
     """
-    table = _run(
-        "lon",
-        _problems(suite, dimension, instance),
-        range(replicates),
-        functools.partial(
-            lon_module.lon_features,
-            budget_per_dimension=budget_per_dimension,
-            n_runs=runs,
-            n_iter_no_change=iter_no_change,
-        ),
-        {
-            "budget_per_dimension": budget_per_dimension,
-            "runs": runs,
-            "iter_no_change": iter_no_change,
-            "step_size": lon_module.STEP_SIZE,
-            "coordinate_precision": lon_module.COORDINATE_PRECISION,
-            "fitness_precision": lon_module.FITNESS_PRECISION,
-        },
-        results,
-        jobs,
-        seed,
+    settings = lon_pipeline.Settings(
+        runs=runs,
+        iter_no_change=iter_no_change,
+        run_budget_per_dimension=run_budget_per_dimension,
+        coordinate_precision=coordinate_precision,
+        fitness_precision=fitness_precision,
     )
+    with _report_locked():
+        table = lon_pipeline.run(
+            _problems(suite, dimension, instance),
+            range(replicates),
+            settings,
+            results,
+            n_jobs=jobs,
+            global_seed=seed,
+            log=functools.partial(typer.echo, err=True),
+        )
     typer.echo(table.to_csv(index=False), nl=False)
 
 
