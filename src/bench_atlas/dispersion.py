@@ -1,7 +1,7 @@
 """Dispersion suite: atmospheric source location from dispersion-bench.
 
 The objective is a Rust advection-diffusion model driven by ICON winds. The
-``dispersion_bench`` package (0.4 or newer) exposes its problems as IOH
+``dispersion_bench`` package (0.1 or newer) exposes its problems as IOH
 problems, which are adapted here like the other IOH suites. It is not a
 declared dependency of bench-atlas (its repository is private); install it
 separately to use this suite.
@@ -28,8 +28,8 @@ def dispersion() -> list[Problem]:
         import dispersion_bench
     except ImportError as error:
         raise ImportError(
-            "The dispersion suite needs the dispersion-bench package, version 0.4 or newer "
-            "(https://github.com/zakrzewow/dispersion-bench)"
+            "The dispersion suite needs the dispersion-bench package, version 0.1 or newer "
+            "(https://github.com/helix-agh/dispersion-bench)"
         ) from error
     return [
         from_ioh(
