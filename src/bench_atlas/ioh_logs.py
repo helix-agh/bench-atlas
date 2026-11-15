@@ -59,7 +59,7 @@ def write_all(
     n_jobs: int = 1,
     log: Callable[[str], None] | None = None,
 ) -> pd.DataFrame:
-    """Write the IOH logs of ``runs`` to ``<results>/ioh_logs/<suite>/<optimizer>/``.
+    """Write the IOH logs of ``runs`` to ``<results>/ioh-logs/<suite>/<optimizer>/``.
 
     The (suite, optimizer) groups are written in parallel with joblib; each group has its
     own folder and logger. Earlier logs of the same groups are replaced.
@@ -82,7 +82,7 @@ def write_all(
         columns=["suite", "optimizer", "runs", "folder"],
     )
     if log is not None:
-        log(f"ioh_logs: {summary['runs'].sum()} runs written to {len(summary)} folders")
+        log(f"ioh-logs: {summary['runs'].sum()} runs written to {len(summary)} folders")
     return summary
 
 

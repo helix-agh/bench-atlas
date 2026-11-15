@@ -164,6 +164,6 @@ def test_write_all(tmp_path: Path) -> None:
     assert list(summary["runs"]) == [4, 4]
     for optimizer in ("CMAstd", "PSO"):
         folder = store.ioh_logs_path(tmp_path, "bbob", optimizer)
-        assert folder == tmp_path / "ioh_logs" / "bbob" / optimizer
+        assert folder == tmp_path / "ioh-logs" / "bbob" / optimizer
         info = json.loads((folder / "IOHprofiler_f1_Sphere.json").read_text())
         assert [scenario["dimension"] for scenario in info["scenarios"]] == [2, 3]

@@ -12,7 +12,8 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, ioh_logs, lon_pipeline, portfolio, store, suites
+from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, suites
+from bench_atlas import ioh_logs as ioh_logs_module
 from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
@@ -362,8 +363,8 @@ def run(
     typer.echo(table.drop(columns=_LIST_COLUMNS).to_csv(index=False), nl=False)
 
 
-@app.command(name="ioh_logs")
-def ioh_logs_command(
+@app.command()
+def ioh_logs(
     results: Path = typer.Option(
         Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
     ),
@@ -387,13 +388,13 @@ def ioh_logs_command(
     """Write IOH logs of the optimizer portfolio runs.
 
     Replays the runs stored in ``<results>/runs.parquet`` through IOH's Analyzer logger
-    and writes ``<results>/ioh_logs/<suite>/<optimizer>/``, replacing earlier logs of
+    and writes ``<results>/ioh-logs/<suite>/<optimizer>/``, replacing earlier logs of
     the same suite and optimizer. IOHanalyzer and IOHinspector read this format; zip
-    ``<results>/ioh_logs/<suite>`` to load all optimizers of a suite at once. Logged
+    ``<results>/ioh-logs/<suite>`` to load all optimizers of a suite at once. Logged
     values are ``f - f_opt``, as in IOH's BBOB logs. Prints one CSV row per folder:
     ``suite``, ``optimizer``, ``runs`` and ``folder``.
     """
-    runs = ioh_logs.select(
+    runs = ioh_logs_module.select(
         store.load(results, "runs"),
         budget_per_dimension,
         [name.value for name in suite or []],
@@ -402,7 +403,7 @@ def ioh_logs_command(
     if runs.empty:
         typer.echo(f"No runs to log in {store.path(results, 'runs')}.", err=True)
         raise typer.Exit(code=1)
-    summary = ioh_logs.write_all(
+    summary = ioh_logs_module.write_all(
         runs, results, n_jobs=jobs, log=functools.partial(typer.echo, err=True)
     )
     typer.echo(summary.to_csv(index=False), nl=False)

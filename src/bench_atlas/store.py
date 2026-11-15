@@ -6,7 +6,7 @@ table on disk is always complete. A lock file guards against two runs writing th
 table at once, which would lose rows, so one analysis in one results folder is written
 by one run (one node) at a time. CMLON graphs are stored as GraphML files in
 ``<results>/cmlon/``, written the same way. IOH logs of the portfolio runs go to
-``<results>/ioh_logs/<suite>/<optimizer>/`` (see :mod:`bench_atlas.ioh_logs`).
+``<results>/ioh-logs/<suite>/<optimizer>/`` (see :mod:`bench_atlas.ioh_logs`).
 
 The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, global
 seed, replicate, run and analysis settings match. Neither the analysis code nor the library versions are
@@ -44,7 +44,7 @@ __all__ = [
 
 VERSION_PREFIX = "version_"
 CMLON_FOLDER = "cmlon"
-IOH_LOGS_FOLDER = "ioh_logs"
+IOH_LOGS_FOLDER = "ioh-logs"
 _CMLON_ATTRIBUTES = ("best_fitness", "eq_atol", "minimize")
 
 
