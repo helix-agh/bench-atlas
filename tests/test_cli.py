@@ -213,6 +213,7 @@ def test_run(tmp_path: Path) -> None:
     assert (table["evaluations"] == 20).all()
     assert (table["budget_per_dimension"] == 10).all()
     assert "curve_f" not in table
+    assert "x_best" not in table
     stored = pd.read_parquet(tmp_path / "runs.parquet")
     assert len(stored) == 24 * 2 * 2
     assert (stored["curve_f"].map(len) > 0).all()

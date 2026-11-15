@@ -47,6 +47,18 @@ def test_portfolio_run(name: str) -> None:
     assert np.all(np.diff(curve_f) < 0)
     assert curve_evaluations[-1] <= 100
     assert result["best_f"] == curve_f[-1]
+    assert result["best_f"] == _sphere(np.array([result["x_best"]]))[0]
+    assert result["f_last"] >= result["best_f"]
+    assert result["name"] == ""
+    assert np.isnan(result["f_opt"])
+
+
+def test_problem_metadata() -> None:
+    problem = bbob([2], [1])[7]
+    result = portfolio.optimize(problem, 0, "RandomSearch", budget_per_dimension=10)
+    assert result["name"] == problem.name == "Rosenbrock"
+    assert result["f_opt"] == problem.f_opt
+    assert len(result["x_best"]) == 2
 
 
 @pytest.mark.parametrize("name", list(portfolio.PORTFOLIO))

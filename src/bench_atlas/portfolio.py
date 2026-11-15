@@ -71,9 +71,13 @@ def optimize(
         budget_per_dimension: Evaluations per dimension.
 
     Returns:
-        ``evaluations`` used; ``best_f``, the best evaluated value; and the best-so-far
-        curve as ``curve_evaluations``, the evaluation numbers (from 1) at which the
-        best value improved, with ``curve_f``, the best value after each of them.
+        The problem's ``name`` and ``f_opt`` (NaN if unknown), so that a row describes
+        its problem (e.g. for an IOHanalyzer export); ``evaluations`` used; ``best_f``,
+        the best evaluated value, and ``x_best``, its point on [0, 1]^d; ``f_last``,
+        the value of the last evaluation (IOH logs it when a run ends); and the
+        best-so-far curve as ``curve_evaluations``, the evaluation numbers (from 1) at
+        which the best value improved, with ``curve_f``, the best value after each of
+        them.
     """
     d = problem.dimension
     budget = budget_per_dimension * d
@@ -83,6 +87,8 @@ def optimize(
         parametrization=parametrization, budget=budget, num_workers=1
     )
     best = math.inf
+    f = math.nan
+    x_best = np.full(d, np.nan)
     curve_evaluations: list[int] = []
     curve_f: list[float] = []
     evaluations = 0
@@ -96,11 +102,16 @@ def optimize(
         evaluations = evaluation
         if f < best:
             best = f
+            x_best = np.array(candidate.value, dtype=float)
             curve_evaluations.append(evaluation)
             curve_f.append(f)
     return {
+        "name": problem.name,
+        "f_opt": math.nan if problem.f_opt is None else problem.f_opt,
         "evaluations": evaluations,
         "best_f": best,
+        "x_best": x_best.tolist(),
+        "f_last": f,
         "curve_evaluations": curve_evaluations,
         "curve_f": curve_f,
     }

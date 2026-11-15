@@ -284,7 +284,7 @@ def timing(
 
 
 RUN_REPLICATES = 5
-_CURVE_COLUMNS = ["curve_evaluations", "curve_f"]
+_LIST_COLUMNS = ["x_best", "curve_evaluations", "curve_f"]
 
 
 def _check_optimizers(value: list[str]) -> list[str]:
@@ -341,10 +341,12 @@ def run(
     gets ``--budget-per-dimension`` times d evaluations. The seed of a replicate is
     derived from ``--seed``, the problem id and the replicate, and is shared by all
     optimizers. Rows hold the problem id, ``replicate``, ``seed``, the budget, the
-    optimizer, library versions, ``evaluations``, ``best_f`` and the best-so-far
-    curve (``curve_evaluations``, ``curve_f``: the evaluations at which the best value
+    optimizer, library versions, the problem's ``name`` and ``f_opt``,
+    ``evaluations``, ``best_f``, its point ``x_best`` on [0, 1]^d, ``f_last`` (the
+    value of the last evaluation) and the best-so-far curve (``curve_evaluations``, ``curve_f``: the evaluations at which the best value
     improved, and the best value after each). Prints the requested rows as CSV
-    without the curves. GNBG suites have a fixed d = 30 and one instance.
+    without ``x_best`` and the curves. GNBG suites have a fixed d = 30 and one
+    instance.
     """
     table = _run(
         "runs",
@@ -357,7 +359,7 @@ def run(
         seed,
         variants=[{"optimizer": name} for name in optimizer],
     )
-    typer.echo(table.drop(columns=_CURVE_COLUMNS).to_csv(index=False), nl=False)
+    typer.echo(table.drop(columns=_LIST_COLUMNS).to_csv(index=False), nl=False)
 
 
 @app.command()
