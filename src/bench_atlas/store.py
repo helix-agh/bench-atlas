@@ -5,7 +5,8 @@ Saving rewrites the whole file through a temporary file and an atomic rename, so
 table on disk is always complete. A lock file guards against two runs writing the same
 table at once, which would lose rows, so one analysis in one results folder is written
 by one run (one node) at a time. CMLON graphs are stored as GraphML files in
-``<results>/cmlon/``, written the same way.
+``<results>/cmlon/``, written the same way. IOH logs of the portfolio runs go to
+``<results>/ioh_logs/<suite>/<optimizer>/`` (see :mod:`bench_atlas.ioh_logs`).
 
 The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, global
 seed, replicate, run and analysis settings match. Neither the analysis code nor the library versions are
@@ -31,6 +32,7 @@ from lonkit import CMLON
 __all__ = [
     "LockedError",
     "cmlon_path",
+    "ioh_logs_path",
     "load",
     "load_all",
     "load_cmlon",
@@ -42,6 +44,7 @@ __all__ = [
 
 VERSION_PREFIX = "version_"
 CMLON_FOLDER = "cmlon"
+IOH_LOGS_FOLDER = "ioh_logs"
 _CMLON_ATTRIBUTES = ("best_fitness", "eq_atol", "minimize")
 
 
@@ -163,3 +166,8 @@ def load_cmlon(results: Path, name: str) -> CMLON:
 def cmlon_path(results: Path, name: str) -> Path:
     """Location of the CMLON ``name``."""
     return Path(results) / CMLON_FOLDER / f"{name}.graphml"
+
+
+def ioh_logs_path(results: Path, suite: str, optimizer: str) -> Path:
+    """Folder of the IOH logs of ``optimizer`` on ``suite``."""
+    return Path(results) / IOH_LOGS_FOLDER / suite / optimizer

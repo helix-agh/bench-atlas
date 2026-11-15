@@ -72,7 +72,7 @@ def optimize(
 
     Returns:
         The problem's ``name`` and ``f_opt`` (NaN if unknown), so that a row describes
-        its problem (e.g. for an IOHanalyzer export); ``evaluations`` used; ``best_f``,
+        its problem (e.g. for IOH logs); ``evaluations`` used; ``best_f``,
         the best evaluated value, and ``x_best``, its point on [0, 1]^d; ``f_last``,
         the value of the last evaluation (IOH logs it when a run ends); and the
         best-so-far curve as ``curve_evaluations``, the evaluation numbers (from 1) at

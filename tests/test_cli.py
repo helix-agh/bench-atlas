@@ -10,7 +10,7 @@ from bench_atlas.cli import app
 
 runner = CliRunner()
 
-SUBCOMMANDS = ["ela", "lon", "timing", "run", "metrics", "report"]
+SUBCOMMANDS = ["ela", "lon", "timing", "run", "ioh_logs", "metrics", "report"]
 
 
 def test_version() -> None:
@@ -226,3 +226,28 @@ def test_run(tmp_path: Path) -> None:
 def test_run_rejects_unknown_optimizer(tmp_path: Path) -> None:
     result = runner.invoke(app, ["run", "bbob", "-d", "2", "-a", "Nope", "-o", str(tmp_path)])
     assert result.exit_code == 2
+
+
+def test_ioh_logs(tmp_path: Path) -> None:
+    run_args = ["run", "bbob", "-d", "2", "-i", "1", "--replicates", "2", "-B", "10"]
+    run_args += ["-a", "CMAstd", "-a", "PSO", "-o", str(tmp_path)]
+    assert runner.invoke(app, run_args).exit_code == 0
+    result = runner.invoke(app, ["ioh_logs", "-o", str(tmp_path), "-B", "10", "-a", "PSO"])
+    assert result.exit_code == 0, result.output
+    summary = pd.read_csv(io.StringIO(result.stdout))
+    assert summary.to_dict("records") == [
+        {
+            "suite": "bbob",
+            "optimizer": "PSO",
+            "runs": 48,
+            "folder": str(tmp_path / "ioh_logs" / "bbob" / "PSO"),
+        }
+    ]
+    assert len(list((tmp_path / "ioh_logs" / "bbob" / "PSO").glob("*.json"))) == 24
+    assert not (tmp_path / "ioh_logs" / "bbob" / "CMAstd").exists()
+
+
+def test_ioh_logs_without_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ioh_logs", "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No runs to log" in result.stderr
