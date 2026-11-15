@@ -12,7 +12,7 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, lon_pipeline, store, suites
+from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, suites
 from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
@@ -122,6 +122,7 @@ def _run(
     results: Path,
     jobs: int,
     seed: int = 0,
+    variants: Sequence[Mapping[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
     with _report_locked():
@@ -135,6 +136,7 @@ def _run(
             n_jobs=jobs,
             global_seed=seed,
             log=functools.partial(typer.echo, err=True),
+            variants=variants,
         )
 
 
@@ -281,10 +283,81 @@ def timing(
     typer.echo(table.to_csv(index=False), nl=False)
 
 
+RUN_REPLICATES = 5
+_CURVE_COLUMNS = ["curve_evaluations", "curve_f"]
+
+
+def _check_optimizers(value: list[str]) -> list[str]:
+    for name in value:
+        try:
+            portfolio.optimizer_class(name)
+        except KeyError:
+            raise typer.BadParameter(
+                f"{name!r} is neither in the portfolio nor in Nevergrad's registry."
+            ) from None
+    if len(set(value)) != len(value):
+        raise typer.BadParameter("An optimizer is given more than once.")
+    return value
+
+
 @app.command()
-def run() -> None:
-    """Run the optimizer portfolio on benchmark problems."""
-    _not_implemented("run")
+def run(
+    suite: list[Suite] = typer.Argument(..., help="Suites to run on."),
+    dimension: list[int] = typer.Option(
+        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+    instance: list[int] = typer.Option(
+        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    replicates: int = typer.Option(
+        RUN_REPLICATES, "--replicates", min=1, help="Runs per problem and optimizer."
+    ),
+    optimizer: list[str] = typer.Option(
+        list(portfolio.PORTFOLIO),
+        "--optimizer",
+        "-a",
+        callback=_check_optimizers,
+        help="Optimizers: names in the portfolio or in Nevergrad's registry.",
+    ),
+    budget_per_dimension: int = typer.Option(
+        portfolio.BUDGET_PER_DIMENSION,
+        "--budget-per-dimension",
+        "-B",
+        min=1,
+        help="Evaluation budget of one run, per dimension.",
+    ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the run seeds."),
+) -> None:
+    """Run the optimizer portfolio on benchmark problems.
+
+    Adds one row per problem, replicate (0-4) and optimizer to
+    ``<results>/runs.parquet``, skipping rows that are already there. Every optimizer
+    gets ``--budget-per-dimension`` times d evaluations. The seed of a replicate is
+    derived from ``--seed``, the problem id and the replicate, and is shared by all
+    optimizers. Rows hold the problem id, ``replicate``, ``seed``, the budget, the
+    optimizer, library versions, ``evaluations``, ``best_f`` and the best-so-far
+    curve (``curve_evaluations``, ``curve_f``: the evaluations at which the best value
+    improved, and the best value after each). Prints the requested rows as CSV
+    without the curves. GNBG suites have a fixed d = 30 and one instance.
+    """
+    table = _run(
+        "runs",
+        _problems(suite, dimension, instance),
+        range(replicates),
+        functools.partial(portfolio.optimize, budget_per_dimension=budget_per_dimension),
+        {"budget_per_dimension": budget_per_dimension},
+        results,
+        jobs,
+        seed,
+        variants=[{"optimizer": name} for name in optimizer],
+    )
+    typer.echo(table.drop(columns=_CURVE_COLUMNS).to_csv(index=False), nl=False)
 
 
 @app.command()

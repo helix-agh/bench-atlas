@@ -26,7 +26,7 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "lon", "timing")])
+@pytest.mark.parametrize("command", ["metrics", "report"])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
@@ -199,3 +199,29 @@ def test_core_dependencies_import() -> None:
     import pandas  # noqa: F401
     import pyarrow  # noqa: F401
     import umap  # noqa: F401
+
+
+def test_run(tmp_path: Path) -> None:
+    args = ["run", "bbob", "-d", "2", "-i", "1", "--replicates", "2", "-B", "10"]
+    args += ["-a", "CMAstd", "-a", "RandomSearch", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0, result.output
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 2 * 2
+    assert list(table["optimizer"][:4]) == ["CMAstd", "RandomSearch"] * 2
+    assert list(table["replicate"][:4]) == [0, 0, 1, 1]
+    assert (table["evaluations"] == 20).all()
+    assert (table["budget_per_dimension"] == 10).all()
+    assert "curve_f" not in table
+    stored = pd.read_parquet(tmp_path / "runs.parquet")
+    assert len(stored) == 24 * 2 * 2
+    assert (stored["curve_f"].map(len) > 0).all()
+    assert not table.isna().any().any()
+    again = runner.invoke(app, args)
+    assert "96 cached, 0 to compute" in again.stderr
+    assert again.stdout == result.stdout
+
+
+def test_run_rejects_unknown_optimizer(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["run", "bbob", "-d", "2", "-a", "Nope", "-o", str(tmp_path)])
+    assert result.exit_code == 2
