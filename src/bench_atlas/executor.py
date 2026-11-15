@@ -1,11 +1,12 @@
 """Cached, parallel execution of an analysis over benchmark problems.
 
 One task is (problem, replicate), or (problem, replicate, run) for analyses that split
-a replicate into independent runs. Its seed is derived from a global seed, the problem
-id, the replicate and the run (:func:`task_seed`), never from task order or worker, so
-results don't depend on ``n_jobs``. A task is identified by the problem, the global seed,
-the replicate, the run and the analysis settings, not by its seed: seeds are 32-bit, so
-two tasks may share one. Tasks run with joblib, each with single-threaded BLAS /
+a replicate into independent runs, repeated for every variant of the analysis settings
+(e.g. every optimizer). Its seed is derived from a global seed, the problem id, the
+replicate and the run (:func:`task_seed`), never from task order or worker, so results
+don't depend on ``n_jobs``. A task is identified by the problem, the global seed, the
+replicate, the run, the analysis settings and the variant, not by its seed: seeds are
+32-bit, so two tasks may share one. Tasks run with joblib, each with single-threaded BLAS /
 OpenMP. Finished rows are added to the analysis table of the results store
 (:mod:`bench_atlas.store`); tasks already in the table are skipped, so an
 interrupted run resumes where it stopped.
@@ -34,9 +35,9 @@ from bench_atlas.problems import Problem, ProblemId
 __all__ = ["FLUSH_SECONDS", "VERSIONED", "run", "task_seed"]
 
 FLUSH_SECONDS = 10.0
-VERSIONED = ("bench-atlas", "orivex", "lonkit", "ioh")
+VERSIONED = ("bench-atlas", "orivex", "lonkit", "ioh", "nevergrad")
 
-Compute = Callable[[Problem, int], Mapping[str, Any]]
+Compute = Callable[..., Mapping[str, Any]]
 
 
 def run(
@@ -51,22 +52,24 @@ def run(
     flush_seconds: float = FLUSH_SECONDS,
     log: Callable[[str], None] | None = None,
     runs: int | None = None,
+    variants: Sequence[Mapping[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Rows of ``analysis`` for every problem and replicate, computing only missing ones.
 
     A row is ``problem, suite, function, instance, dimension, replicate`` (and ``run``
-    if ``runs`` is given), ``global_seed, seed``, the ``params``, the ``version_*`` of
-    :data:`VERSIONED` and ``compute(problem, seed)``. Rows of the table whose
-    ``(problem, global_seed, replicate, run, *params)`` match a task are reused, and
-    a task requested twice (a repeated problem, replicate or run) is computed and
-    returned once. New rows are saved at most every ``flush_seconds`` and when the run
-    ends, also on ``KeyboardInterrupt`` and SIGTERM.
+    if ``runs`` is given), ``global_seed, seed``, the ``params``, the variant, the
+    ``version_*`` of :data:`VERSIONED` and ``compute(problem, seed, **variant)``. Rows of
+    the table whose ``(problem, global_seed, replicate, run, *params, *variant)`` match a
+    task are reused, and a task requested twice (a repeated problem, replicate or run) is
+    computed and returned once. New rows are saved at most every ``flush_seconds`` and
+    when the run ends, also on ``KeyboardInterrupt`` and SIGTERM.
 
     Args:
         analysis: Table name in the results store.
         problems: Problems to analyse.
         replicates: Replicate numbers; each gets its own seed.
-        compute: Picklable ``(problem, seed) -> features``, e.g. a ``functools.partial``.
+        compute: Picklable ``(problem, seed, **variant) -> features``, e.g. a
+            ``functools.partial``.
         params: Analysis settings; part of the cache key and stored in every row.
         results: Folder of the results store.
         n_jobs: joblib ``n_jobs``; ``-1`` uses all CPUs.
@@ -75,19 +78,28 @@ def run(
         log: Receives progress messages.
         runs: Split every replicate into this many tasks, one per run, each with its
             own seed.
+        variants: Run every task once per variant, a mapping of extra settings passed
+            to ``compute`` as keyword arguments, stored in the row and part of the cache
+            key (e.g. ``[{"optimizer": "CMAstd"}, {"optimizer": "PSO"}]``). All
+            variants have the same keys, distinct from those of ``params``. The
+            variants of a task share its seed, and they all go to one worker pool.
 
     Returns:
-        The requested rows in problem, replicate, then run order, without duplicates.
+        The requested rows in problem, replicate, run, then variant order, without
+        duplicates.
     """
-    tasks: dict[tuple[Any, ...], tuple[Problem, int, int | None, int]] = {}
+    variants = _check_variants(variants, params)
+    tasks: dict[tuple[Any, ...], tuple[Problem, int, int | None, dict[str, Any], int]] = {}
     for problem in problems:
         for replicate in replicates:
             for run in range(runs) if runs is not None else [None]:
                 seed = task_seed(global_seed, problem.id, replicate, run)
-                task = (problem, replicate, run, seed)
-                key = _key(str(problem.id), global_seed, replicate, run, params)
-                tasks.setdefault(key, task)
-    columns = _key_columns(params, runs is not None)
+                for variant in variants:
+                    settings = {**params, **variant}
+                    key = _key(str(problem.id), global_seed, replicate, run, settings)
+                    tasks.setdefault(key, (problem, replicate, run, variant, seed))
+    names = {**params, **variants[0]} if variants else params
+    columns = _key_columns(names, runs is not None)
     keys = list(tasks)
     with store.lock(results, analysis):
         table = store.load(results, analysis)
@@ -131,7 +143,7 @@ def task_seed(
 
 def _execute(
     analysis: str,
-    todo: list[tuple[Problem, int, int | None, int]],
+    todo: list[tuple[Problem, int, int | None, dict[str, Any], int]],
     compute: Compute,
     params: Mapping[str, Any],
     results: Path,
@@ -173,9 +185,18 @@ def _execute(
                         compute,
                         problem,
                         seed,
-                        _meta(problem, replicate, run, global_seed, seed, params, versions),
+                        variant,
+                        _meta(
+                            problem,
+                            replicate,
+                            run,
+                            global_seed,
+                            seed,
+                            {**params, **variant},
+                            versions,
+                        ),
                     )
-                    for problem, replicate, run, seed in todo
+                    for problem, replicate, run, variant, seed in todo
                 )
                 for row in rows:
                     new_rows.append(row)
@@ -187,10 +208,14 @@ def _execute(
 
 
 def _run_task(
-    compute: Compute, problem: Problem, seed: int, meta: dict[str, Any]
+    compute: Compute,
+    problem: Problem,
+    seed: int,
+    variant: Mapping[str, Any],
+    meta: dict[str, Any],
 ) -> dict[str, Any]:
     with threadpool_limits(limits=1):
-        return {**meta, **compute(problem, seed)}
+        return {**meta, **compute(problem, seed, **variant)}
 
 
 def _meta(
@@ -235,6 +260,25 @@ def _table_keys(table: pd.DataFrame, columns: Sequence[str]) -> Iterator[tuple[A
     if table.empty or any(column not in table for column in columns):
         return iter(())
     return zip(*(table[column].tolist() for column in columns), strict=True)
+
+
+def _check_variants(
+    variants: Sequence[Mapping[str, Any]] | None, params: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """``variants`` with keys in one order (``[{}]`` if ``None``), checked."""
+    if variants is None:
+        return [{}]
+    if not variants:
+        return []
+    names = list(variants[0])
+    if any(set(variant) != set(names) for variant in variants):
+        raise ValueError("All variants must have the same keys")
+    if set(names) & set(params):
+        raise ValueError("Variant keys must differ from the keys of params")
+    ordered = [{name: variant[name] for name in names} for variant in variants]
+    if len({tuple(variant.values()) for variant in ordered}) != len(ordered):
+        raise ValueError("Variants must be distinct")
+    return ordered
 
 
 @contextmanager
