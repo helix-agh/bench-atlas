@@ -3,7 +3,14 @@
 Each analysis (``ela``, ``lon``, ...) is a single table ``<results>/<analysis>.parquet``.
 Saving rewrites the whole file through a temporary file and an atomic rename, so the
 table on disk is always complete. A lock file guards against two runs writing the same
-table at once, which would lose rows.
+table at once, which would lose rows, so one analysis in one results folder is written
+by one run (one node) at a time.
+
+The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, seed
+and analysis settings match. Neither the analysis code nor the library versions are
+part of that key: the versions are recorded in ``version_*`` columns, and :func:`load`
+warns if a table mixes them. After a change to the analysis code, start from a fresh
+results folder or delete ``<results>/<analysis>.parquet``.
 """
 
 from __future__ import annotations

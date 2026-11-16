@@ -93,6 +93,10 @@ def ela(
     so raising ``--replicates`` computes only the new ones. Rows hold the problem id,
     ``replicate``, ``seed``, ``points_per_dimension``, library versions, ``f_med``
     and all orivex features. GNBG suites have a fixed d = 30 and one instance.
+
+    Stored rows are reused by problem, seed and settings only, not by the version
+    of the analysis code: after changing the code, use a fresh ``--results`` folder
+    or delete ``<results>/ela.parquet``.
     """
     table = _run(
         "ela",
@@ -179,7 +183,9 @@ def timing(
     CPU runs at a lower all-core clock (about 3 % slower for a short run on a
     112-core node, about 11 % under sustained full load). The host and the
     effective number of jobs are therefore part of every row and of the cache
-    key, so timings measured under different conditions are never mixed.
+    key, so timings measured under different conditions are never mixed. After
+    changing the timing code, use a fresh ``--results`` folder or delete
+    ``<results>/timing.parquet``.
     """
     problems = _problems(suite, dimension, [1])
     params = {"n_jobs": joblib.effective_n_jobs(jobs), "host": socket.gethostname()}
