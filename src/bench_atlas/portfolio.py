@@ -18,27 +18,66 @@ row. Two choices differ from Nevergrad's plain names:
   it over and over (on the sphere in d = 2, 92 % of 2000 evaluations repeat a point).
   ``RNelderMead`` restarts from a random point, like Nevergrad's ``RPowell`` and
   ``RCobyla``.
+
+Two settings differ from Nevergrad's defaults:
+
+- Sampling is uniform on [0, 1]^d (:func:`unit_box`), so ``RandomSearch`` is uniform
+  random search; Nevergrad's bounded ``Array`` samples around the centre.
+- ``CMAstd`` starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`) instead
+  of Nevergrad's 0.024, with which it is a local search from the centre.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import nevergrad as ng
 import numpy as np
 from nevergrad.optimization.base import ConfiguredOptimizer, Optimizer
+from nevergrad.optimization.optimizerlib import ParametrizedCMA
 from nevergrad.optimization.recastlib import NonObjectOptimizer
 
 from bench_atlas.problems import Problem
 
-__all__ = ["BUDGET_PER_DIMENSION", "PORTFOLIO", "best_so_far", "optimize", "optimizer_class"]
+__all__ = [
+    "BUDGET_PER_DIMENSION",
+    "CMA_SIGMA0",
+    "PORTFOLIO",
+    "SIGMA",
+    "best_so_far",
+    "optimize",
+    "optimizer_class",
+    "unit_box",
+]
 
 BUDGET_PER_DIMENSION = 1000
+SIGMA = 1 / 6
+CMA_SIGMA0 = 0.25
 
-PORTFOLIO: dict[str, ConfiguredOptimizer | type[Optimizer]] = {
-    "CMAstd": ng.optimizers.registry["CMAstd"],
+OptimizerClass = ConfiguredOptimizer | type[Optimizer] | Callable[..., Optimizer]
+
+
+def _cmastd(parametrization: ng.p.Array, budget: int, num_workers: int) -> Optimizer:
+    """Nevergrad's ``CMAstd`` with an initial step size of ``CMA_SIGMA0`` on [0, 1]^d.
+
+    On a bounded domain Nevergrad starts CMA-ES with ``scale`` times 0.3 (d < 18) or 0.15
+    (d >= 18), in units of the parametrization's sigma (``SIGMA``).
+    """
+    multiplier = 0.3 if parametrization.dimension < 18 else 0.15
+    config = ParametrizedCMA(
+        scale=CMA_SIGMA0 / (SIGMA * multiplier),
+        popsize_factor=3,
+        elitist=False,
+        diagonal=False,
+        fcmaes=False,
+    )
+    return config(parametrization, budget=budget, num_workers=num_workers)
+
+
+PORTFOLIO: dict[str, OptimizerClass] = {
+    "CMAstd": _cmastd,
     "DiagonalCMA": ng.optimizers.registry["DiagonalCMA"],
     "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
     "PSO": ng.optimizers.registry["PSO"],
@@ -59,8 +98,8 @@ def optimize(
 ) -> dict[str, Any]:
     """One run of ``optimizer`` on ``problem`` with ``budget_per_dimension * d`` evaluations.
 
-    The search space is [0, 1]^d (``ng.p.Array`` with these bounds), and all randomness
-    comes from ``seed`` through the parametrization's ``random_state``. Points are
+    The search space is [0, 1]^d (:func:`unit_box`), and all randomness comes
+    from ``seed`` through the parametrization's ``random_state``. Points are
     evaluated one at a time; the run ends early only if the optimizer raises
     ``NevergradEarlyStopping``.
 
@@ -81,7 +120,7 @@ def optimize(
     """
     d = problem.dimension
     budget = budget_per_dimension * d
-    parametrization = ng.p.Array(shape=(d,), lower=0.0, upper=1.0)
+    parametrization = unit_box(d)
     parametrization.random_state = np.random.RandomState(seed)
     instance = optimizer_class(optimizer)(
         parametrization=parametrization, budget=budget, num_workers=1
@@ -134,7 +173,16 @@ def best_so_far(
     return np.where(last >= 0, values[np.maximum(last, 0)], np.nan)
 
 
-def optimizer_class(name: str) -> ConfiguredOptimizer | type[Optimizer]:
+def unit_box(dimension: int) -> ng.p.Array:
+    """[0, 1]^d with uniform sampling and Nevergrad's mutation sigma of 1/6, from the centre."""
+    return (
+        ng.p.Array(init=np.full(dimension, 0.5))
+        .set_mutation(sigma=SIGMA)
+        .set_bounds(0.0, 1.0, full_range_sampling=True)
+    )
+
+
+def optimizer_class(name: str) -> OptimizerClass:
     """Optimizer ``name`` from :data:`PORTFOLIO`, else from Nevergrad's registry.
 
     Raises:

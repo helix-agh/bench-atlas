@@ -86,10 +86,51 @@ def test_portfolio_names_are_stable() -> None:
 
 
 def test_optimizer_class() -> None:
-    assert portfolio.optimizer_class("CMAstd") is ng.optimizers.registry["CMAstd"]
+    assert portfolio.optimizer_class("DiagonalCMA") is ng.optimizers.registry["DiagonalCMA"]
     assert portfolio.optimizer_class("NelderMead") is ng.optimizers.registry["NelderMead"]
     with pytest.raises(KeyError):
         portfolio.optimizer_class("NoSuchOptimizer")
+
+
+def _asks(name: str, d: int, n: int, seed: int = 0) -> np.ndarray:
+    parametrization = portfolio.unit_box(d)
+    parametrization.random_state = np.random.RandomState(seed)
+    optimizer = portfolio.optimizer_class(name)(parametrization, budget=n, num_workers=1)
+    return np.array([optimizer.ask().value for _ in range(n)])
+
+
+def test_random_search_is_uniform() -> None:
+    points = _asks("RandomSearch", 2, 4000)
+    assert points.min() >= 0 and points.max() <= 1
+    assert points.std() == pytest.approx(np.sqrt(1 / 12), abs=0.01)
+    counts, _ = np.histogram(points, bins=5, range=(0, 1))
+    assert np.all(np.abs(counts / counts.mean() - 1) < 0.1)
+
+
+def test_mutation_steps_keep_nevergrads_sigma() -> None:
+    assert portfolio.unit_box(3).sigma.value == pytest.approx(portfolio.SIGMA)
+    steps = _asks("OnePlusOne", 2, 1000)[1:]
+    assert steps.std() == pytest.approx(portfolio.SIGMA, abs=0.01)
+
+
+def _cma(name: str, d: int):
+    parametrization = portfolio.unit_box(d)
+    return portfolio.optimizer_class(name)(parametrization, budget=100, num_workers=1)
+
+
+@pytest.mark.parametrize("d", [2, 10, 20, 40])
+def test_cmastd_starts_with_the_explicit_step_size(d: int) -> None:
+    cma = _cma("CMAstd", d)
+    assert cma.es.sigma0 * portfolio.SIGMA == pytest.approx(portfolio.CMA_SIGMA0)
+    reference = ng.optimizers.registry["CMAstd"](portfolio.unit_box(d), budget=100)
+    assert cma.es.popsize == reference.es.popsize
+    assert not cma.es.opts["CMA_diagonal"]
+    assert not cma.es.opts["CMA_elitist"]
+    np.testing.assert_array_equal(cma.es.mean, 0.0)
+
+
+def test_diagonal_cma_keeps_nevergrads_step_size() -> None:
+    assert _cma("DiagonalCMA", 2).es.sigma0 == pytest.approx(0.3)
 
 
 def test_early_stop(monkeypatch: pytest.MonkeyPatch) -> None:

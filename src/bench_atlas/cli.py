@@ -337,15 +337,16 @@ def run(
 ) -> None:
     """Run the optimizer portfolio on benchmark problems.
 
-    Adds one row per problem, replicate (0-4) and optimizer to
+    Adds one row per problem, replicate (0 to ``--replicates`` - 1) and optimizer to
     ``<results>/runs.parquet``, skipping rows that are already there. Every optimizer
     gets ``--budget-per-dimension`` times d evaluations. The seed of a replicate is
     derived from ``--seed``, the problem id and the replicate, and is shared by all
-    optimizers. Rows hold the problem id, ``replicate``, ``seed``, the budget, the
-    optimizer, library versions, the problem's ``name`` and ``f_opt``,
+    optimizers. Rows hold the problem id, ``replicate``, ``global_seed``, ``seed``, the
+    budget, the optimizer, library versions, the problem's ``name`` and ``f_opt``,
     ``evaluations``, ``best_f``, its point ``x_best`` on [0, 1]^d, ``f_last`` (the
-    value of the last evaluation) and the best-so-far curve (``curve_evaluations``, ``curve_f``: the evaluations at which the best value
-    improved, and the best value after each). Prints the requested rows as CSV
+    value of the last evaluation) and the best-so-far curve (``curve_evaluations``,
+    ``curve_f``: the evaluations at which the best value improved, and the best value
+    after each). Prints the requested rows as CSV
     without ``x_best`` and the curves. GNBG suites have a fixed d = 30 and one
     instance.
     """

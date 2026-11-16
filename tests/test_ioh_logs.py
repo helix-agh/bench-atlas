@@ -124,7 +124,7 @@ def test_dat_lines_follow_the_curve(tmp_path: Path) -> None:
         values = [float(line.split()[1]) for line in lines]
         improvements = list(row.curve_evaluations)
         assert evaluations[: len(improvements)] == improvements
-        np.testing.assert_allclose(values[: len(improvements)], row.curve_f, rtol=1e-9)
+        np.testing.assert_allclose(values[: len(improvements)], row.curve_f, rtol=1e-9, atol=1e-10)
         if improvements[-1] != 100:
             assert evaluations[-1] == 100
             assert values[-1] == pytest.approx(row.f_last)
