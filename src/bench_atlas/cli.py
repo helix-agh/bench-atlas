@@ -47,9 +47,6 @@ def main(
     """Analyse and compare continuous black-box optimization benchmarks."""
 
 
-ELA_REPLICATES = 10
-
-
 def _check_jobs(value: int) -> int:
     if value == 0:
         raise typer.BadParameter("0 is not a valid number of jobs.")
@@ -76,6 +73,9 @@ def ela(
     points_per_dimension: int = typer.Option(
         50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
     ),
+    replicates: int = typer.Option(
+        10, "--replicates", "-r", min=1, help="Independent Sobol samples per problem."
+    ),
     results: Path = typer.Option(
         Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
     ),
@@ -86,17 +86,18 @@ def ela(
 ) -> None:
     """Compute ELA features.
 
-    Adds one row per problem and replicate (0-9) to ``<results>/ela.parquet``,
-    skipping rows that are already there, and prints the requested rows as CSV.
-    Each replicate's Sobol sample seed is derived from ``--seed``, the problem id
-    and the replicate. Rows hold the problem id, ``replicate``, ``seed``,
-    ``points_per_dimension``, library versions, ``f_med`` and all orivex
-    features. GNBG suites have a fixed d = 30 and one instance.
+    Adds one row per problem and replicate (0 to ``--replicates`` - 1) to
+    ``<results>/ela.parquet``, skipping rows that are already there, and prints the
+    requested rows as CSV. Each replicate's Sobol sample seed is derived from
+    ``--seed``, the problem id and the replicate, not from the number of replicates,
+    so raising ``--replicates`` computes only the new ones. Rows hold the problem id,
+    ``replicate``, ``seed``, ``points_per_dimension``, library versions, ``f_med``
+    and all orivex features. GNBG suites have a fixed d = 30 and one instance.
     """
     table = _run(
         "ela",
         _problems(suite, dimension, instance),
-        range(ELA_REPLICATES),
+        range(replicates),
         functools.partial(ela_features, points_per_dimension=points_per_dimension),
         {"points_per_dimension": points_per_dimension},
         results,

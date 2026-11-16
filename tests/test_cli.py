@@ -110,6 +110,20 @@ def test_ela_runs_repeated_problems_once(tmp_path: Path) -> None:
     assert len(pd.read_parquet(tmp_path / "ela.parquet")) == 24 * 10
 
 
+def test_ela_replicates_extend_the_cache(tmp_path: Path) -> None:
+    base = ["ela", "bbob", "-d", "2", "-i", "1", "-n", "10", "-o", str(tmp_path)]
+    two = runner.invoke(app, [*base, "-r", "2"])
+    assert two.exit_code == 0
+    three = runner.invoke(app, [*base, "-r", "3"])
+    assert "48 cached, 24 to compute" in three.stderr
+    one = runner.invoke(app, [*base, "-r", "1"])
+    assert "24 cached, 0 to compute" in one.stderr
+    table = pd.read_csv(io.StringIO(one.stdout))
+    assert len(table) == 24
+    assert set(table["replicate"]) == {0}
+    assert runner.invoke(app, [*base, "-r", "0"]).exit_code == 2
+
+
 def test_ela_refuses_a_locked_table(tmp_path: Path) -> None:
     with store.lock(tmp_path, "ela"):
         result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-o", str(tmp_path)])
