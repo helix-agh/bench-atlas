@@ -3,7 +3,7 @@
 import enum
 import functools
 import socket
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +109,7 @@ def ela(
 def _run(
     analysis: str,
     problems: list[Problem],
-    replicates: Iterable[int],
+    replicates: Sequence[int],
     compute: Callable[[Problem, int], Mapping[str, Any]],
     params: Mapping[str, Any],
     results: Path,

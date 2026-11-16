@@ -14,7 +14,7 @@ import hashlib
 import signal
 import threading
 import time
-from collections.abc import Callable, Generator, Iterable, Iterator, Mapping
+from collections.abc import Callable, Generator, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -39,7 +39,7 @@ Compute = Callable[[Problem, int], Mapping[str, Any]]
 def run(
     analysis: str,
     problems: Iterable[Problem],
-    replicates: Iterable[int],
+    replicates: Sequence[int],
     compute: Compute,
     params: Mapping[str, Any],
     results: Path,
