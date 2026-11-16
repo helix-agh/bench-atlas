@@ -143,7 +143,7 @@ def test_ela_seed_changes_samples(tmp_path: Path) -> None:
 
 
 def test_lon_on_bbob(tmp_path: Path) -> None:
-    args = ["lon", "bbob", "-d", "2", "-r", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
+    args = ["lon", "bbob", "-d", "2", "--runs", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
     result = runner.invoke(app, args)
     assert result.exit_code == 0
     assert "lon_runs: 0 cached, 48 to compute" in result.stderr
@@ -163,7 +163,7 @@ def test_lon_on_bbob(tmp_path: Path) -> None:
 
 
 def test_lon_other_precision_reuses_the_runs(tmp_path: Path) -> None:
-    args = ["lon", "bbob", "-d", "2", "-r", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
+    args = ["lon", "bbob", "-d", "2", "--runs", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
     runner.invoke(app, args)
     result = runner.invoke(app, [*args, "--coordinate-precision", "2"])
     assert result.exit_code == 0
@@ -172,20 +172,20 @@ def test_lon_other_precision_reuses_the_runs(tmp_path: Path) -> None:
     assert len(list((tmp_path / "cmlon").glob("*.graphml"))) == 48
 
 
-def test_lon_replicates_budget_and_jobs(tmp_path: Path) -> None:
-    base = ["lon", "bbob", "-d", "2", "--replicates", "2", "-r", "3", "-B", "100"]
+def test_lon_replicates_and_jobs(tmp_path: Path) -> None:
+    base = ["lon", "bbob", "-d", "2", "-r", "2", "--runs", "3", "--iter-no-change", "5"]
     serial = runner.invoke(app, [*base, "-o", str(tmp_path / "serial")])
     assert serial.exit_code == 0
     table = pd.read_csv(io.StringIO(serial.stdout))
     assert len(table) == 24 * 2
     assert list(table["replicate"][:2]) == [0, 1]
-    assert (table["evaluations"] <= 3 * 100 * 2).all()
+    assert (table["n_runs"] == 3).all()
     parallel = runner.invoke(app, [*base, "-o", str(tmp_path / "parallel"), "-j", "2"])
     assert parallel.stdout == serial.stdout
 
 
-def test_lon_rejects_zero_budget(tmp_path: Path) -> None:
-    result = runner.invoke(app, ["lon", "bbob", "-d", "2", "-B", "0", "-o", str(tmp_path)])
+def test_lon_rejects_zero_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["lon", "bbob", "-d", "2", "--runs", "0", "-o", str(tmp_path)])
     assert result.exit_code == 2
 
 

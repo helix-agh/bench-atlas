@@ -169,21 +169,14 @@ def lon(
         [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
     ),
     replicates: int = typer.Option(
-        1, "--replicates", min=1, help="Basin-hopping samples per problem."
+        1, "--replicates", "-r", min=1, help="Basin-hopping samples per problem."
     ),
-    runs: int = typer.Option(lon_module.N_RUNS, "--runs", "-r", min=1, help="Basin-hopping runs."),
+    runs: int = typer.Option(lon_module.N_RUNS, "--runs", min=1, help="Basin-hopping runs."),
     iter_no_change: int = typer.Option(
         lon_module.N_ITER_NO_CHANGE,
         "--iter-no-change",
         min=1,
         help="Non-improving perturbations that stop a run.",
-    ),
-    run_budget_per_dimension: int = typer.Option(
-        lon_module.RUN_BUDGET_PER_DIMENSION,
-        "--run-budget-per-dimension",
-        "-B",
-        min=1,
-        help="Evaluation budget of one run, per dimension.",
     ),
     coordinate_precision: int = typer.Option(
         lon_module.COORDINATE_PRECISION,
@@ -220,7 +213,6 @@ def lon(
     settings = lon_pipeline.Settings(
         runs=runs,
         iter_no_change=iter_no_change,
-        run_budget_per_dimension=run_budget_per_dimension,
         coordinate_precision=coordinate_precision,
         fitness_precision=fitness_precision,
     )

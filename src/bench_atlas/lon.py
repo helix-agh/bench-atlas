@@ -10,7 +10,6 @@ sampling again, and the runs of one problem can be sampled in parallel.
 
 from __future__ import annotations
 
-import warnings
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -26,34 +25,29 @@ __all__ = ["cmlon_features", "cmlon_from_runs", "sample_run"]
 STEP_SIZE = 0.1
 N_RUNS = 100
 N_ITER_NO_CHANGE = 250
-RUN_BUDGET_PER_DIMENSION = 1_000_000
 COORDINATE_PRECISION = 4
 FITNESS_PRECISION = 4
 
-_BUDGET_EXHAUSTED = "evaluation budget exhausted"
 _TRACE_COLUMNS = ["run", "fit1", "node1", "fit2", "node2"]
 
 
 def sample_run(
     problem: Problem,
     seed: int,
-    run_budget_per_dimension: int = RUN_BUDGET_PER_DIMENSION,
     n_iter_no_change: int = N_ITER_NO_CHANGE,
 ) -> dict[str, Any]:
     """One lonkit basin-hopping run on ``problem``.
 
     L-BFGS-B local searches with uniform perturbations of fixed size ``STEP_SIZE`` on
-    [0, 1]^d; the run stops after ``n_iter_no_change`` non-improving perturbations or
-    when ``run_budget_per_dimension * d`` points have been evaluated.
+    [0, 1]^d; the run stops after ``n_iter_no_change`` non-improving perturbations.
 
     Returns:
-        ``evaluations``; ``optima_f``, the fitness of the initial local optimum and of
-        every accepted one, in order; and ``optima_x``, their coordinates, flattened
-        (d values per optimum). Both are empty if the initial local search failed.
+        ``evaluations``, the points evaluated by this run; ``optima_f``, the fitness
+        of the initial local optimum and of every accepted one, in order; and
+        ``optima_x``, their coordinates, flattened (d values per optimum). Both are
+        empty if the initial local search failed.
     """
-    d = problem.dimension
     start = problem.evaluations
-    objective = _PointObjective(problem, start + run_budget_per_dimension * d)
     sampler = BasinHoppingSampler(
         BasinHoppingSamplerConfig(
             n_runs=1,
@@ -65,9 +59,7 @@ def sample_run(
             n_jobs=1,
         )
     )
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=f".*{_BUDGET_EXHAUSTED}")
-        sample = sampler.sample(objective, [(0.0, 1.0)] * d)
+    sample = sampler.sample(_PointObjective(problem), [(0.0, 1.0)] * problem.dimension)
     optima_x, optima_f = _accepted_optima(sample.raw_records)
     return {
         "evaluations": problem.evaluations - start,
@@ -151,22 +143,11 @@ def _node(x: np.ndarray, precision: int | None) -> str:
     return "_".join(f"{v:.{precision}f}" for v in np.round(x, precision) + 0.0)
 
 
-class _BudgetExhausted(ValueError):
-    """Raised by the objective once the budget is spent.
-
-    lonkit treats a ``ValueError`` from the local search as a failed search: it
-    rejects the perturbation, or skips the run if it was the initial search.
-    """
-
-
 @dataclass(frozen=True, eq=False)
 class _PointObjective:
-    """Single-point view ``x (d,) -> float`` of a problem, limited to ``limit`` evaluations."""
+    """Single-point view ``x (d,) -> float`` of a problem."""
 
     problem: Problem
-    limit: int
 
     def __call__(self, x: np.ndarray) -> float:
-        if self.problem.evaluations >= self.limit:
-            raise _BudgetExhausted(_BUDGET_EXHAUSTED)
         return float(self.problem(x[np.newaxis])[0])

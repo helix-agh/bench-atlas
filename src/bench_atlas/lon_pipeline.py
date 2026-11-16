@@ -34,17 +34,12 @@ class Settings:
 
     runs: int = lon.N_RUNS
     iter_no_change: int = lon.N_ITER_NO_CHANGE
-    run_budget_per_dimension: int = lon.RUN_BUDGET_PER_DIMENSION
     coordinate_precision: int = lon.COORDINATE_PRECISION
     fitness_precision: int = lon.FITNESS_PRECISION
 
     def sampling(self) -> dict[str, Any]:
         """Cache key of one run: the settings that change the search."""
-        return {
-            "run_budget_per_dimension": self.run_budget_per_dimension,
-            "iter_no_change": self.iter_no_change,
-            "step_size": lon.STEP_SIZE,
-        }
+        return {"iter_no_change": self.iter_no_change, "step_size": lon.STEP_SIZE}
 
     def network(self) -> dict[str, Any]:
         """Cache key of one CMLON: all settings."""
@@ -73,11 +68,7 @@ def run(
         "lon_runs",
         problems,
         replicates,
-        functools.partial(
-            lon.sample_run,
-            run_budget_per_dimension=settings.run_budget_per_dimension,
-            n_iter_no_change=settings.iter_no_change,
-        ),
+        functools.partial(lon.sample_run, n_iter_no_change=settings.iter_no_change),
         settings.sampling(),
         results,
         n_jobs=n_jobs,

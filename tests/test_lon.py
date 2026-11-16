@@ -1,5 +1,3 @@
-import warnings
-
 import numpy as np
 import pytest
 from lonkit import BasinHoppingSampler, BasinHoppingSamplerConfig, LONConfig
@@ -42,14 +40,11 @@ def test_sample_run_is_deterministic_for_a_seed() -> None:
     assert first["optima_f"] != other["optima_f"]
 
 
-def test_run_budget_limits_evaluations() -> None:
+def test_evaluations_count_only_the_run() -> None:
     problem = bbob([2], [1])[14]
     problem(np.full((10, 2), 0.5))
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        run = sample_run(problem, 0, run_budget_per_dimension=200)
-    assert run["evaluations"] == problem.evaluations - 10 <= 200 * 2
-    assert not [w for w in caught if "budget" in str(w.message)]
+    run = sample_run(problem, 0, n_iter_no_change=10)
+    assert run["evaluations"] == problem.evaluations - 10 > 0
 
 
 def test_accepted_optima_of_special_runs() -> None:
@@ -79,7 +74,7 @@ def test_cmlon_matches_lonkit(function: int, precisions: tuple) -> None:
             fitness_precision=fitness_precision,
         )
     )
-    sample = sampler.sample(_PointObjective(problem, 10**12), [(0.0, 1.0)] * 2)
+    sample = sampler.sample(_PointObjective(problem), [(0.0, 1.0)] * 2)
     expected = sampler.sample_to_lon(sample, LONConfig(warn_on_duplicates=False)).to_cmlon()
     runs = []
     for run in range(1, 6):
