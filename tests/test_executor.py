@@ -130,6 +130,23 @@ def test_save_retried_after_interrupt_adds_no_duplicates(
     assert len(store.load(tmp_path, "test")) == 6
 
 
+class _Count:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, problem: Problem, seed: int) -> dict[str, float]:
+        self.calls += 1
+        return _seed_feature(problem, seed)
+
+
+def test_duplicate_tasks_run_once(tmp_path: Path) -> None:
+    compute = _Count()
+    table = executor.run("test", _problems() * 2, [0, 1, 1], compute, {"n": 1}, tmp_path)
+    assert compute.calls == 6
+    assert list(table["replicate"]) == [0, 1] * 3
+    pd.testing.assert_frame_equal(table, store.load(tmp_path, "test"))
+
+
 def test_locked_table_is_refused(tmp_path: Path) -> None:
     with store.lock(tmp_path, "test"), pytest.raises(store.LockedError):
         _run(tmp_path)

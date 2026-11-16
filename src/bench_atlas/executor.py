@@ -52,8 +52,9 @@ def run(
 
     A row is ``problem, suite, function, instance, dimension, replicate, seed``, the
     ``params``, the ``version_*`` of :data:`VERSIONED` and ``compute(problem, seed)``.
-    Rows of the table whose ``(problem, seed, *params)`` match a task are reused.
-    New rows are saved at most every ``flush_seconds`` and when the run ends, also
+    Rows of the table whose ``(problem, seed, *params)`` match a task are reused, and
+    a task requested twice (a repeated problem or replicate) is computed and returned
+    once. New rows are saved at most every ``flush_seconds`` and when the run ends, also
     on ``KeyboardInterrupt`` and SIGTERM.
 
     Args:
@@ -69,18 +70,18 @@ def run(
         log: Receives progress messages.
 
     Returns:
-        The requested rows in problem, then replicate order.
+        The requested rows in problem, then replicate order, without duplicates.
     """
-    tasks = [
-        (problem, replicate, task_seed(global_seed, problem.id, replicate))
-        for problem in problems
-        for replicate in replicates
-    ]
-    keys = [_key(str(problem.id), seed, params) for problem, _, seed in tasks]
+    tasks: dict[tuple[Any, ...], tuple[Problem, int, int]] = {}
+    for problem in problems:
+        for replicate in replicates:
+            seed = task_seed(global_seed, problem.id, replicate)
+            tasks.setdefault(_key(str(problem.id), seed, params), (problem, replicate, seed))
+    keys = list(tasks)
     with store.lock(results, analysis):
         table = store.load(results, analysis)
         done = set(_table_keys(table, params))
-        todo = [task for task, key in zip(tasks, keys, strict=True) if key not in done]
+        todo = [task for key, task in tasks.items() if key not in done]
         _log(log, f"{analysis}: {len(tasks) - len(todo)} cached, {len(todo)} to compute")
         if todo:
             table = _execute(

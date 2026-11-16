@@ -101,6 +101,15 @@ def test_ela_stores_and_reuses_results(tmp_path: Path) -> None:
     assert parallel.stdout == first.stdout
 
 
+def test_ela_runs_repeated_problems_once(tmp_path: Path) -> None:
+    args = ["ela", "bbob", "-d", "2", "-d", "2", "-i", "1", "-n", "10", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0
+    assert "0 cached, 240 to compute" in result.stderr
+    assert len(pd.read_csv(io.StringIO(result.stdout))) == 24 * 10
+    assert len(pd.read_parquet(tmp_path / "ela.parquet")) == 24 * 10
+
+
 def test_ela_refuses_a_locked_table(tmp_path: Path) -> None:
     with store.lock(tmp_path, "ela"):
         result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-o", str(tmp_path)])
