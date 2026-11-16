@@ -92,7 +92,12 @@ def run(
 def _chains(
     runs: pd.DataFrame, problems: Sequence[Problem], replicates: list[int], global_seed: int
 ) -> _Chains:
-    """Runs of every (problem, replicate seed): replicate, run optima, evaluations."""
+    """Runs of every (problem, replicate seed): replicate, run optima, evaluations.
+
+    Stage 2 receives only the seed of a replicate, so two replicates of one problem
+    with the same seed (unlikely with 32-bit seeds) would be indistinguishable; that
+    is an error rather than a silently shared network.
+    """
     grouped = {
         key: (
             list(zip(group["optima_x"], group["optima_f"], strict=True)),
@@ -105,7 +110,11 @@ def _chains(
         for replicate in replicates:
             optima, evaluations = grouped[(str(problem.id), replicate)]
             seed = executor.task_seed(global_seed, problem.id, replicate)
-            chains[(str(problem.id), seed)] = (replicate, optima, evaluations)
+            previous = chains.setdefault((str(problem.id), seed), (replicate, optima, evaluations))
+            if previous[0] != replicate:
+                raise ValueError(
+                    f"replicates {previous[0]} and {replicate} of {problem.id} have the same seed"
+                )
     return chains
 
 

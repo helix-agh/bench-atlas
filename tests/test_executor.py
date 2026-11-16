@@ -70,6 +70,7 @@ def test_rows_and_order(tmp_path: Path) -> None:
     )
     assert list(table["replicate"]) == [0, 1] * 3
     assert (table["n"] == 1).all()
+    assert (table["global_seed"] == 0).all()
     assert {"version_bench_atlas", "version_orivex", "version_lonkit", "version_ioh"} <= set(
         table.columns
     )
@@ -145,6 +146,54 @@ def test_duplicate_tasks_run_once(tmp_path: Path) -> None:
     assert compute.calls == 6
     assert list(table["replicate"]) == [0, 1] * 3
     pd.testing.assert_frame_equal(table, store.load(tmp_path, "test"))
+
+
+class _CallNumber:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, problem: Problem, seed: int) -> dict[str, float]:
+        self.calls += 1
+        return {"value": float(self.calls)}
+
+
+@pytest.mark.parametrize(("runs", "n_tasks"), [(None, 6), (3, 18)])
+def test_tasks_with_the_same_seed_are_distinct(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, runs: int | None, n_tasks: int
+) -> None:
+    """Tasks are identified by problem, replicate and run, not by their seed."""
+    monkeypatch.setattr(executor, "task_seed", lambda *_args: 7)
+    compute = _CallNumber()
+    table = _run(tmp_path, compute, runs=runs)
+    assert compute.calls == n_tasks
+    assert (table["seed"] == 7).all()
+    assert sorted(table["value"]) == list(range(1, n_tasks + 1))
+    pd.testing.assert_frame_equal(table, store.load(tmp_path, "test"))
+    messages: list[str] = []
+    again = _run(tmp_path, _CallNumber(), runs=runs, log=messages.append)
+    assert messages == [f"test: {n_tasks} cached, 0 to compute"]
+    pd.testing.assert_frame_equal(table, again)
+
+
+def test_other_global_seed_is_a_new_experiment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(executor, "task_seed", lambda *_args: 7)
+    first = _run(tmp_path, _CallNumber())
+    messages: list[str] = []
+    other = _run(tmp_path, _CallNumber(), global_seed=1, log=messages.append)
+    assert messages[0] == "test: 0 cached, 6 to compute"
+    assert (other["global_seed"] == 1).all()
+    assert len(store.load(tmp_path, "test")) == 12
+    pd.testing.assert_frame_equal(first, _run(tmp_path, _CallNumber()))
+
+
+def test_table_without_global_seed_is_recomputed(tmp_path: Path) -> None:
+    first = _run(tmp_path)
+    store.save(tmp_path, "test", first.drop(columns="global_seed"))
+    messages: list[str] = []
+    _run(tmp_path, log=messages.append)
+    assert messages[0] == "test: 0 cached, 6 to compute"
 
 
 def test_locked_table_is_refused(tmp_path: Path) -> None:

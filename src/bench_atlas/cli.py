@@ -206,7 +206,7 @@ def lon(
     built at the requested precision, saved to ``<results>/cmlon/`` and its metrics
     are added to ``<results>/lon.parquet``; stored runs and rows are skipped, so
     another precision reuses the runs. Prints the requested ``lon`` rows as CSV: the
-    problem id, ``replicate``, ``seed``, the settings, library versions, the
+    problem id, ``replicate``, ``global_seed``, ``seed``, the settings, library versions, the
     evaluations used, the number of runs, the lonkit CMLON metrics and ``cmlon``, the
     graph name. GNBG suites have a fixed d = 30 and one instance.
     """
