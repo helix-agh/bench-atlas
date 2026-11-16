@@ -112,21 +112,28 @@ def _execute(
     flush_seconds: float,
     log: Callable[[str], None] | None,
 ) -> pd.DataFrame:
-    """Run ``todo``, adding finished rows to ``table`` and saving it as they come."""
+    """Run ``todo``, adding finished rows to ``table`` and saving it as they come.
+
+    Every save writes ``table`` plus all rows computed so far, so a save retried after
+    an interrupted one (e.g. SIGTERM inside :func:`store.save`) writes the same table
+    again instead of adding rows twice.
+    """
     versions = {f"version_{name.replace('-', '_')}": version(name) for name in VERSIONED}
-    pending: list[dict[str, Any]] = []
-    computed = 0
+    base = table
+    new_rows: list[dict[str, Any]] = []
+    saved = 0
     last_flush = time.monotonic()
 
     def flush() -> None:
-        nonlocal table, last_flush
-        if pending:
-            new = pd.DataFrame(pending)
-            table = new if table.empty else pd.concat([table, new], ignore_index=True)
-            store.save(results, analysis, table)
-            pending.clear()
+        nonlocal table, saved, last_flush
+        if len(new_rows) > saved:
+            count = len(new_rows)
+            new = pd.DataFrame(new_rows)
+            current = new if base.empty else pd.concat([base, new], ignore_index=True)
+            store.save(results, analysis, current)
+            table, saved = current, count
             target = store.path(results, analysis)
-            _log(log, f"{analysis}: {computed}/{len(todo)} computed, saved to {target}")
+            _log(log, f"{analysis}: {count}/{len(todo)} computed, saved to {target}")
         last_flush = time.monotonic()
 
     with _sigterm_as_exit():
@@ -139,8 +146,7 @@ def _execute(
                     for problem, replicate, seed in todo
                 )
                 for row in rows:
-                    pending.append(row)
-                    computed += 1
+                    new_rows.append(row)
                     if time.monotonic() - last_flush >= flush_seconds:
                         flush()
         finally:

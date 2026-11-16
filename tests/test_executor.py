@@ -102,6 +102,34 @@ def test_interrupted_run_resumes(tmp_path: Path) -> None:
     assert messages[0] == "test: 2 cached, 4 to compute"
 
 
+class _SaveFailsOnce:
+    def __init__(self, call: int) -> None:
+        self.call = call
+        self.calls = 0
+        self.save = store.save
+
+    def __call__(self, results: Path, analysis: str, table: pd.DataFrame) -> None:
+        self.calls += 1
+        if self.calls == self.call:
+            raise SystemExit(143)
+        self.save(results, analysis, table)
+
+
+def test_save_retried_after_interrupt_adds_no_duplicates(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(store, "save", _SaveFailsOnce(2))
+    with pytest.raises(SystemExit):
+        _run(tmp_path, _InterruptAfter(2), flush_seconds=0)
+    monkeypatch.undo()
+    saved = store.load(tmp_path, "test")
+    assert len(saved) == 2
+    assert not saved.duplicated(["problem", "seed"]).any()
+    table = _run(tmp_path, _FailOn(set(saved["seed"])))
+    assert len(table) == 6
+    assert len(store.load(tmp_path, "test")) == 6
+
+
 def test_locked_table_is_refused(tmp_path: Path) -> None:
     with store.lock(tmp_path, "test"), pytest.raises(store.LockedError):
         _run(tmp_path)
