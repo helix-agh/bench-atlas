@@ -10,7 +10,7 @@ from bench_atlas.cli import app
 
 runner = CliRunner()
 
-SUBCOMMANDS = ["ela", "lon", "timing", "run", "ioh-logs", "metrics", "report"]
+SUBCOMMANDS = ["ela", "lon", "timing", "run", "ioh-logs", "aocc", "metrics", "report"]
 
 
 def test_version() -> None:
@@ -251,3 +251,34 @@ def test_ioh_logs_without_runs(tmp_path: Path) -> None:
     result = runner.invoke(app, ["ioh-logs", "-o", str(tmp_path)])
     assert result.exit_code == 1
     assert "No runs to log" in result.stderr
+
+
+def test_aocc(tmp_path: Path) -> None:
+    out = ["-o", str(tmp_path)]
+    run_args = ["run", "bbob", "-d", "2", "-i", "1", "--replicates", "2", "-B", "10", "-a", "PSO"]
+    assert runner.invoke(app, [*run_args, *out]).exit_code == 0
+    assert runner.invoke(app, ["aocc", *out]).exit_code == 1
+    ela_args = ["ela", "bbob", "-d", "2", "-i", "1", "-n", "10"]
+    assert runner.invoke(app, [*ela_args, *out]).exit_code == 0
+    args = ["aocc", "--at", "5", "--at", "10", "--at", "20", "--ela-points-per-dimension", "10"]
+    result = runner.invoke(app, [*args, *out])
+    assert result.exit_code == 0, result.output
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 2
+    assert table["f_opt_known"].all()
+    for column in ("aocc_5d", "aocc_10d"):
+        assert table[column].between(0, 1).all()
+    assert table["aocc_20d"].isna().all()
+    stored = pd.read_parquet(tmp_path / "aocc.parquet")
+    assert len(stored) == 24 * 2
+    repeated = ["aocc", "--at", "5", "--at", "5", "--ela-points-per-dimension", "10", *out]
+    result = runner.invoke(app, repeated)
+    assert result.exit_code == 0, result.output
+    assert list(pd.read_csv(io.StringIO(result.stdout)).columns).count("aocc_5d") == 1
+    assert list(pd.read_parquet(tmp_path / "aocc.parquet").columns).count("aocc_5d") == 1
+
+
+def test_aocc_without_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["aocc", "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No runs" in result.stderr

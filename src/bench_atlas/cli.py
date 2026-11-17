@@ -13,6 +13,7 @@ import pandas as pd
 import typer
 
 from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, suites
+from bench_atlas import aocc as aocc_module
 from bench_atlas import ioh_logs as ioh_logs_module
 from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
@@ -408,6 +409,50 @@ def ioh_logs(
         runs, results, n_jobs=jobs, log=functools.partial(typer.echo, err=True)
     )
     typer.echo(summary.to_csv(index=False), nl=False)
+
+
+@app.command()
+def aocc(
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    at: list[int] = typer.Option(
+        list(aocc_module.BUDGETS_PER_DIMENSION),
+        "--at",
+        min=1,
+        help="Budgets, per dimension, at which to compute AOCC.",
+    ),
+    ela_points_per_dimension: int = typer.Option(
+        aocc_module.ELA_POINTS_PER_DIMENSION,
+        "--ela-points-per-dimension",
+        min=1,
+        help="Sample size per dimension of the ELA rows that give f_med.",
+    ),
+) -> None:
+    """Compute the normalized AOCC of the optimizer portfolio runs.
+
+    Reads ``<results>/runs.parquet`` and the ``f_med`` of ``<results>/ela.parquet`` (run
+    ``bench-atlas ela`` on the same problems first) and replaces
+    ``<results>/aocc.parquet``. The error ``(f_best - f*) / (f_med - f*)`` is clipped to
+    [1e-8, 1] on a log scale, with ``f*`` the known optimum or else the best value of
+    any run of the problem, and ``f_med`` the median over the ELA replicates. Prints
+    one CSV row per run: its id columns, ``f_opt`` (the ``f*`` used), ``f_opt_known``,
+    ``f_med`` and ``aocc_<m>d`` for every ``--at m`` (NaN beyond the run's budget).
+    """
+    runs = store.load(results, "runs")
+    if runs.empty:
+        typer.echo(f"No runs in {store.path(results, 'runs')}.", err=True)
+        raise typer.Exit(code=1)
+    try:
+        table = aocc_module.aocc_table(
+            runs, store.load(results, "ela"), at, ela_points_per_dimension
+        )
+    except ValueError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(code=1) from None
+    with _report_locked(), store.lock(results, "aocc"):
+        store.save(results, "aocc", table)
+    typer.echo(table.to_csv(index=False), nl=False)
 
 
 @app.command()
