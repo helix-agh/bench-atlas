@@ -271,6 +271,11 @@ def test_aocc(tmp_path: Path) -> None:
     assert table["aocc_20d"].isna().all()
     stored = pd.read_parquet(tmp_path / "aocc.parquet")
     assert len(stored) == 24 * 2
+    repeated = ["aocc", "--at", "5", "--at", "5", "--ela-points-per-dimension", "10", *out]
+    result = runner.invoke(app, repeated)
+    assert result.exit_code == 0, result.output
+    assert list(pd.read_csv(io.StringIO(result.stdout)).columns).count("aocc_5d") == 1
+    assert list(pd.read_parquet(tmp_path / "aocc.parquet").columns).count("aocc_5d") == 1
 
 
 def test_aocc_without_runs(tmp_path: Path) -> None:

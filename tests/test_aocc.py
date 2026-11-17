@@ -61,6 +61,7 @@ def _run(problem: str, optimizer: str, f_opt: float, curve: tuple[list, list]) -
         "instance": 1,
         "dimension": 2,
         "replicate": 0,
+        "global_seed": 0,
         "seed": 7,
         "optimizer": optimizer,
         "budget_per_dimension": 200,
@@ -111,6 +112,13 @@ def test_table() -> None:
     assert table["aocc_200d"][0] == pytest.approx((200 * first + 200 * last) / 400)
     assert table["aocc_300d"].isna().all()
     assert table["aocc_200d"][2] > table["aocc_200d"][1]
+
+
+def test_repeated_budgets_give_one_column() -> None:
+    runs = pd.DataFrame([_run("p1", "A", 0.0, ([1], [1e-2]))])
+    table = aocc.aocc_table(runs, pd.DataFrame(_ela("p1", [1.0])), (10, 5, 10))
+    assert list(table.columns[-2:]) == ["aocc_10d", "aocc_5d"]
+    assert table.columns.is_unique
 
 
 def test_table_needs_ela() -> None:

@@ -47,6 +47,7 @@ _RUN_COLUMNS = [
     "instance",
     "dimension",
     "replicate",
+    "global_seed",
     "seed",
     "optimizer",
     "budget_per_dimension",
@@ -69,12 +70,13 @@ def aocc_table(
     Returns:
         One row per run, in the order of ``runs``: its id columns, ``f_opt`` (the
         ``f*`` used), ``f_opt_known``, ``f_med`` and ``aocc_<m>d`` for each budget of
-        ``m * d`` evaluations; NaN where ``m`` exceeds the run's budget per dimension.
+        ``m * d`` evaluations (once per budget, in the order first given); NaN where
+        ``m`` exceeds the run's budget per dimension.
 
     Raises:
         ValueError: A problem of ``runs`` has no ELA rows.
     """
-    budgets = list(budgets_per_dimension)
+    budgets = list(dict.fromkeys(budgets_per_dimension))
     f_med = _f_med(runs, ela, ela_points_per_dimension)
     f_opt, known = _f_opt(runs)
     rows = []
