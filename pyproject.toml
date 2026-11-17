@@ -29,6 +29,7 @@ dependencies = [
     "ioh>=0.3.22",
     "orivex>=0.1.0",
     "lonkit>=0.9.0",
+    "nevergrad>=1.0.12",
     "numpy>=1.24.0",
     "pandas>=2.0.0",
     "pyarrow>=14.0.0",

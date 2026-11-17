@@ -10,7 +10,7 @@ from bench_atlas.cli import app
 
 runner = CliRunner()
 
-SUBCOMMANDS = ["ela", "lon", "timing", "run", "metrics", "report"]
+SUBCOMMANDS = ["ela", "lon", "timing", "run", "ioh-logs", "metrics", "report"]
 
 
 def test_version() -> None:
@@ -26,7 +26,7 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "lon", "timing")])
+@pytest.mark.parametrize("command", ["metrics", "report"])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
@@ -199,3 +199,55 @@ def test_core_dependencies_import() -> None:
     import pandas  # noqa: F401
     import pyarrow  # noqa: F401
     import umap  # noqa: F401
+
+
+def test_run(tmp_path: Path) -> None:
+    args = ["run", "bbob", "-d", "2", "-i", "1", "--replicates", "2", "-B", "10"]
+    args += ["-a", "CMAstd", "-a", "RandomSearch", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0, result.output
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24 * 2 * 2
+    assert list(table["optimizer"][:4]) == ["CMAstd", "RandomSearch"] * 2
+    assert list(table["replicate"][:4]) == [0, 0, 1, 1]
+    assert (table["evaluations"] == 20).all()
+    assert (table["budget_per_dimension"] == 10).all()
+    assert "curve_f" not in table
+    assert "x_best" not in table
+    stored = pd.read_parquet(tmp_path / "runs.parquet")
+    assert len(stored) == 24 * 2 * 2
+    assert (stored["curve_f"].map(len) > 0).all()
+    assert not table.isna().any().any()
+    again = runner.invoke(app, args)
+    assert "96 cached, 0 to compute" in again.stderr
+    assert again.stdout == result.stdout
+
+
+def test_run_rejects_unknown_optimizer(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["run", "bbob", "-d", "2", "-a", "Nope", "-o", str(tmp_path)])
+    assert result.exit_code == 2
+
+
+def test_ioh_logs(tmp_path: Path) -> None:
+    run_args = ["run", "bbob", "-d", "2", "-i", "1", "--replicates", "2", "-B", "10"]
+    run_args += ["-a", "CMAstd", "-a", "PSO", "-o", str(tmp_path)]
+    assert runner.invoke(app, run_args).exit_code == 0
+    result = runner.invoke(app, ["ioh-logs", "-o", str(tmp_path), "-B", "10", "-a", "PSO"])
+    assert result.exit_code == 0, result.output
+    summary = pd.read_csv(io.StringIO(result.stdout))
+    assert summary.to_dict("records") == [
+        {
+            "suite": "bbob",
+            "optimizer": "PSO",
+            "runs": 48,
+            "folder": str(tmp_path / "ioh-logs" / "bbob" / "PSO"),
+        }
+    ]
+    assert len(list((tmp_path / "ioh-logs" / "bbob" / "PSO").glob("*.json"))) == 24
+    assert not (tmp_path / "ioh-logs" / "bbob" / "CMAstd").exists()
+
+
+def test_ioh_logs_without_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["ioh-logs", "-o", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "No runs to log" in result.stderr

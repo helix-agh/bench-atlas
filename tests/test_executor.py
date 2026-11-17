@@ -236,3 +236,46 @@ def test_runs_are_separate_tasks(tmp_path: Path) -> None:
     assert table["seed"].nunique() == 18
     again = _run(tmp_path, _FailOn(set(table["seed"])), runs=3)
     pd.testing.assert_frame_equal(table, again)
+
+
+def _variant_feature(problem: Problem, seed: int, scale: int) -> dict[str, float]:
+    return {"value": float(seed % 1000) * scale}
+
+
+def test_variants_are_separate_tasks(tmp_path: Path) -> None:
+    messages: list[str] = []
+    variants = [{"scale": 1}, {"scale": 2}]
+    table = _run(tmp_path, _variant_feature, variants=variants, log=messages.append)
+    assert messages[0] == "test: 0 cached, 12 to compute"
+    assert list(table["scale"][:4]) == [1, 2, 1, 2]
+    assert list(table["replicate"][:4]) == [0, 0, 1, 1]
+    assert (table["n"] == 1).all()
+    assert table["seed"].nunique() == 6
+    assert (table["seed"][::2].to_numpy() == table["seed"][1::2].to_numpy()).all()
+    assert (table["value"][1::2].to_numpy() == 2 * table["value"][::2].to_numpy()).all()
+
+
+def test_new_variant_computes_only_its_tasks(tmp_path: Path) -> None:
+    first = _run(tmp_path, _variant_feature, variants=[{"scale": 1}])
+    messages: list[str] = []
+    table = _run(
+        tmp_path, _variant_feature, variants=[{"scale": 2}, {"scale": 1}], log=messages.append
+    )
+    assert messages[0] == "test: 6 cached, 6 to compute"
+    assert list(table["scale"][:2]) == [2, 1]
+    pd.testing.assert_frame_equal(
+        table[table["scale"] == 1].reset_index(drop=True), first, check_dtype=False
+    )
+
+
+@pytest.mark.parametrize(
+    "variants",
+    [
+        [{"scale": 1}, {"other": 1}],
+        [{"n": 2}],
+        [{"scale": 1}, {"scale": 1}],
+    ],
+)
+def test_invalid_variants_are_refused(tmp_path: Path, variants: list[dict[str, int]]) -> None:
+    with pytest.raises(ValueError):
+        _run(tmp_path, _variant_feature, variants=variants)

@@ -12,7 +12,8 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, lon_pipeline, store, suites
+from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, suites
+from bench_atlas import ioh_logs as ioh_logs_module
 from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
@@ -122,6 +123,7 @@ def _run(
     results: Path,
     jobs: int,
     seed: int = 0,
+    variants: Sequence[Mapping[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
     with _report_locked():
@@ -135,6 +137,7 @@ def _run(
             n_jobs=jobs,
             global_seed=seed,
             log=functools.partial(typer.echo, err=True),
+            variants=variants,
         )
 
 
@@ -281,10 +284,130 @@ def timing(
     typer.echo(table.to_csv(index=False), nl=False)
 
 
+RUN_REPLICATES = 5
+_LIST_COLUMNS = ["x_best", "curve_evaluations", "curve_f"]
+
+
+def _check_optimizers(value: list[str]) -> list[str]:
+    for name in value:
+        try:
+            portfolio.optimizer_class(name)
+        except KeyError:
+            raise typer.BadParameter(
+                f"{name!r} is neither in the portfolio nor in Nevergrad's registry."
+            ) from None
+    if len(set(value)) != len(value):
+        raise typer.BadParameter("An optimizer is given more than once.")
+    return value
+
+
 @app.command()
-def run() -> None:
-    """Run the optimizer portfolio on benchmark problems."""
-    _not_implemented("run")
+def run(
+    suite: list[Suite] = typer.Argument(..., help="Suites to run on."),
+    dimension: list[int] = typer.Option(
+        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+    instance: list[int] = typer.Option(
+        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    replicates: int = typer.Option(
+        RUN_REPLICATES, "--replicates", min=1, help="Runs per problem and optimizer."
+    ),
+    optimizer: list[str] = typer.Option(
+        list(portfolio.PORTFOLIO),
+        "--optimizer",
+        "-a",
+        callback=_check_optimizers,
+        help="Optimizers: names in the portfolio or in Nevergrad's registry.",
+    ),
+    budget_per_dimension: int = typer.Option(
+        portfolio.BUDGET_PER_DIMENSION,
+        "--budget-per-dimension",
+        "-B",
+        min=1,
+        help="Evaluation budget of one run, per dimension.",
+    ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the run seeds."),
+) -> None:
+    """Run the optimizer portfolio on benchmark problems.
+
+    Adds one row per problem, replicate (0 to ``--replicates`` - 1) and optimizer to
+    ``<results>/runs.parquet``, skipping rows that are already there. Every optimizer
+    gets ``--budget-per-dimension`` times d evaluations. The seed of a replicate is
+    derived from ``--seed``, the problem id and the replicate, and is shared by all
+    optimizers. Rows hold the problem id, ``replicate``, ``global_seed``, ``seed``, the
+    budget, the optimizer, library versions, the problem's ``name`` and ``f_opt``,
+    ``evaluations``, ``best_f``, its point ``x_best`` on [0, 1]^d, ``f_last`` (the
+    value of the last evaluation) and the best-so-far curve (``curve_evaluations``,
+    ``curve_f``: the evaluations at which the best value improved, and the best value
+    after each). Prints the requested rows as CSV
+    without ``x_best`` and the curves. GNBG suites have a fixed d = 30 and one
+    instance.
+    """
+    table = _run(
+        "runs",
+        _problems(suite, dimension, instance),
+        range(replicates),
+        functools.partial(portfolio.optimize, budget_per_dimension=budget_per_dimension),
+        {"budget_per_dimension": budget_per_dimension},
+        results,
+        jobs,
+        seed,
+        variants=[{"optimizer": name} for name in optimizer],
+    )
+    typer.echo(table.drop(columns=_LIST_COLUMNS).to_csv(index=False), nl=False)
+
+
+@app.command()
+def ioh_logs(
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    suite: list[Suite] | None = typer.Option(
+        None, "--suite", help="Suites to log; all suites in the runs by default."
+    ),
+    optimizer: list[str] | None = typer.Option(
+        None, "--optimizer", "-a", help="Optimizers to log; all by default."
+    ),
+    budget_per_dimension: int = typer.Option(
+        portfolio.BUDGET_PER_DIMENSION,
+        "--budget-per-dimension",
+        "-B",
+        min=1,
+        help="Budget per dimension of the runs to log.",
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+) -> None:
+    """Write IOH logs of the optimizer portfolio runs.
+
+    Replays the runs stored in ``<results>/runs.parquet`` through IOH's Analyzer logger
+    and writes ``<results>/ioh-logs/<suite>/<optimizer>/``, replacing earlier logs of
+    the same suite and optimizer. IOHanalyzer and IOHinspector read this format; zip
+    ``<results>/ioh-logs/<suite>`` to load all optimizers of a suite at once. Logged
+    values are ``f - f_opt``, as in IOH's BBOB logs. Prints one CSV row per folder:
+    ``suite``, ``optimizer``, ``runs`` and ``folder``.
+    """
+    runs = ioh_logs_module.select(
+        store.load(results, "runs"),
+        budget_per_dimension,
+        [name.value for name in suite or []],
+        optimizer,
+    )
+    if runs.empty:
+        typer.echo(f"No runs to log in {store.path(results, 'runs')}.", err=True)
+        raise typer.Exit(code=1)
+    summary = ioh_logs_module.write_all(
+        runs, results, n_jobs=jobs, log=functools.partial(typer.echo, err=True)
+    )
+    typer.echo(summary.to_csv(index=False), nl=False)
 
 
 @app.command()
