@@ -3,7 +3,8 @@
 import enum
 import functools
 import socket
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +12,8 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, store, suites
+from bench_atlas import __version__, executor, lon_pipeline, store, suites
+from bench_atlas import lon as lon_module
 from bench_atlas.ela import ela_features
 from bench_atlas.problems import Problem
 from bench_atlas.timing import timing_features
@@ -122,7 +124,7 @@ def _run(
     seed: int = 0,
 ) -> pd.DataFrame:
     """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
-    try:
+    with _report_locked():
         return executor.run(
             analysis,
             problems,
@@ -134,6 +136,13 @@ def _run(
             global_seed=seed,
             log=functools.partial(typer.echo, err=True),
         )
+
+
+@contextmanager
+def _report_locked() -> Generator[None, None, None]:
+    """Turn :class:`store.LockedError` into a one-line message and exit code 1."""
+    try:
+        yield
     except store.LockedError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(code=1) from None
@@ -151,9 +160,73 @@ def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> 
 
 
 @app.command()
-def lon() -> None:
-    """Build local optima networks and compute LON metrics."""
-    _not_implemented("lon")
+def lon(
+    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
+    dimension: list[int] = typer.Option(
+        [2, 5, 10], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
+    ),
+    instance: list[int] = typer.Option(
+        [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
+    ),
+    replicates: int = typer.Option(
+        1, "--replicates", "-r", min=1, help="Basin-hopping samples per problem."
+    ),
+    runs: int = typer.Option(lon_module.N_RUNS, "--runs", min=1, help="Basin-hopping runs."),
+    iter_no_change: int = typer.Option(
+        lon_module.N_ITER_NO_CHANGE,
+        "--iter-no-change",
+        min=1,
+        help="Non-improving perturbations that stop a run.",
+    ),
+    coordinate_precision: int = typer.Option(
+        lon_module.COORDINATE_PRECISION,
+        "--coordinate-precision",
+        min=0,
+        help="Decimals of the coordinates that identify an optimum.",
+    ),
+    fitness_precision: int = typer.Option(
+        lon_module.FITNESS_PRECISION,
+        "--fitness-precision",
+        min=0,
+        help="Decimals of the fitness of an optimum.",
+    ),
+    results: Path = typer.Option(
+        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
+    ),
+    jobs: int = typer.Option(
+        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
+    ),
+    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the sampling seeds."),
+) -> None:
+    """Build local optima networks and compute LON metrics.
+
+    Every basin-hopping run is its own task, stored in ``<results>/lon_runs.parquet``
+    with the full-precision optima it accepted, so ``--jobs`` spreads the runs of all
+    problems over the workers. Then, for each problem and replicate, the CMLON is
+    built at the requested precision, saved to ``<results>/cmlon/`` and its metrics
+    are added to ``<results>/lon.parquet``; stored runs and rows are skipped, so
+    another precision reuses the runs. Prints the requested ``lon`` rows as CSV: the
+    problem id, ``replicate``, ``global_seed``, ``seed``, the settings, library versions, the
+    evaluations used, the number of runs, the lonkit CMLON metrics and ``cmlon``, the
+    graph name. GNBG suites have a fixed d = 30 and one instance.
+    """
+    settings = lon_pipeline.Settings(
+        runs=runs,
+        iter_no_change=iter_no_change,
+        coordinate_precision=coordinate_precision,
+        fitness_precision=fitness_precision,
+    )
+    with _report_locked():
+        table = lon_pipeline.run(
+            _problems(suite, dimension, instance),
+            range(replicates),
+            settings,
+            results,
+            n_jobs=jobs,
+            global_seed=seed,
+            log=functools.partial(typer.echo, err=True),
+        )
+    typer.echo(table.to_csv(index=False), nl=False)
 
 
 @app.command()

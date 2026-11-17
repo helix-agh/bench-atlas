@@ -26,7 +26,7 @@ def test_help_lists_subcommands() -> None:
         assert command in result.stdout
 
 
-@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "timing")])
+@pytest.mark.parametrize("command", [c for c in SUBCOMMANDS if c not in ("ela", "lon", "timing")])
 def test_placeholder_subcommands_exit_with_error(command: str) -> None:
     result = runner.invoke(app, [command])
     assert result.exit_code == 1
@@ -140,6 +140,53 @@ def test_ela_seed_changes_samples(tmp_path: Path) -> None:
     ]
     assert not seeds[0].isin(seeds[1]).any()
     assert len(pd.read_parquet(tmp_path / "ela.parquet")) == 2 * 24 * 10
+
+
+def test_lon_on_bbob(tmp_path: Path) -> None:
+    args = ["lon", "bbob", "-d", "2", "--runs", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0
+    assert "lon_runs: 0 cached, 48 to compute" in result.stderr
+    table = pd.read_csv(io.StringIO(result.stdout))
+    assert len(table) == 24
+    assert table["problem"].iloc[0] == "bbob_f1_i1_d2"
+    assert (table["n_runs"] == 2).all()
+    assert (table["coordinate_precision"] == 4).all()
+    assert not table.drop(columns="cmlon").isna().any().any()
+    assert len(pd.read_parquet(tmp_path / "lon_runs.parquet")) == 48
+    assert len(pd.read_parquet(tmp_path / "lon.parquet")) == 24
+    assert store.load_cmlon(tmp_path, table["cmlon"].iloc[0]).n_vertices >= 1
+    again = runner.invoke(app, args)
+    assert "lon_runs: 48 cached, 0 to compute" in again.stderr
+    assert "lon: 24 cached, 0 to compute" in again.stderr
+    assert again.stdout == result.stdout
+
+
+def test_lon_other_precision_reuses_the_runs(tmp_path: Path) -> None:
+    args = ["lon", "bbob", "-d", "2", "--runs", "2", "--iter-no-change", "5", "-o", str(tmp_path)]
+    runner.invoke(app, args)
+    result = runner.invoke(app, [*args, "--coordinate-precision", "2"])
+    assert result.exit_code == 0
+    assert "lon_runs: 48 cached, 0 to compute" in result.stderr
+    assert "lon: 0 cached, 24 to compute" in result.stderr
+    assert len(list((tmp_path / "cmlon").glob("*.graphml"))) == 48
+
+
+def test_lon_replicates_and_jobs(tmp_path: Path) -> None:
+    base = ["lon", "bbob", "-d", "2", "-r", "2", "--runs", "3", "--iter-no-change", "5"]
+    serial = runner.invoke(app, [*base, "-o", str(tmp_path / "serial")])
+    assert serial.exit_code == 0
+    table = pd.read_csv(io.StringIO(serial.stdout))
+    assert len(table) == 24 * 2
+    assert list(table["replicate"][:2]) == [0, 1]
+    assert (table["n_runs"] == 3).all()
+    parallel = runner.invoke(app, [*base, "-o", str(tmp_path / "parallel"), "-j", "2"])
+    assert parallel.stdout == serial.stdout
+
+
+def test_lon_rejects_zero_runs(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["lon", "bbob", "-d", "2", "--runs", "0", "-o", str(tmp_path)])
+    assert result.exit_code == 2
 
 
 def test_core_dependencies_import() -> None:

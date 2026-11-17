@@ -1,8 +1,11 @@
 """Cached, parallel execution of an analysis over benchmark problems.
 
-One task is (problem, replicate). Its seed is derived from a global seed, the problem
-id and the replicate (:func:`task_seed`), never from task order or worker, so results
-don't depend on ``n_jobs``. Tasks run with joblib, each with single-threaded BLAS /
+One task is (problem, replicate), or (problem, replicate, run) for analyses that split
+a replicate into independent runs. Its seed is derived from a global seed, the problem
+id, the replicate and the run (:func:`task_seed`), never from task order or worker, so
+results don't depend on ``n_jobs``. A task is identified by the problem, the global seed,
+the replicate, the run and the analysis settings, not by its seed: seeds are 32-bit, so
+two tasks may share one. Tasks run with joblib, each with single-threaded BLAS /
 OpenMP. Finished rows are added to the analysis table of the results store
 (:mod:`bench_atlas.store`); tasks already in the table are skipped, so an
 interrupted run resumes where it stopped.
@@ -47,15 +50,17 @@ def run(
     global_seed: int = 0,
     flush_seconds: float = FLUSH_SECONDS,
     log: Callable[[str], None] | None = None,
+    runs: int | None = None,
 ) -> pd.DataFrame:
     """Rows of ``analysis`` for every problem and replicate, computing only missing ones.
 
-    A row is ``problem, suite, function, instance, dimension, replicate, seed``, the
-    ``params``, the ``version_*`` of :data:`VERSIONED` and ``compute(problem, seed)``.
-    Rows of the table whose ``(problem, seed, *params)`` match a task are reused, and
-    a task requested twice (a repeated problem or replicate) is computed and returned
-    once. New rows are saved at most every ``flush_seconds`` and when the run ends, also
-    on ``KeyboardInterrupt`` and SIGTERM.
+    A row is ``problem, suite, function, instance, dimension, replicate`` (and ``run``
+    if ``runs`` is given), ``global_seed, seed``, the ``params``, the ``version_*`` of
+    :data:`VERSIONED` and ``compute(problem, seed)``. Rows of the table whose
+    ``(problem, global_seed, replicate, run, *params)`` match a task are reused, and
+    a task requested twice (a repeated problem, replicate or run) is computed and
+    returned once. New rows are saved at most every ``flush_seconds`` and when the run
+    ends, also on ``KeyboardInterrupt`` and SIGTERM.
 
     Args:
         analysis: Table name in the results store.
@@ -68,48 +73,71 @@ def run(
         global_seed: Root of all task seeds.
         flush_seconds: Minimum time between two saves of the table.
         log: Receives progress messages.
+        runs: Split every replicate into this many tasks, one per run, each with its
+            own seed.
 
     Returns:
-        The requested rows in problem, then replicate order, without duplicates.
+        The requested rows in problem, replicate, then run order, without duplicates.
     """
-    tasks: dict[tuple[Any, ...], tuple[Problem, int, int]] = {}
+    tasks: dict[tuple[Any, ...], tuple[Problem, int, int | None, int]] = {}
     for problem in problems:
         for replicate in replicates:
-            seed = task_seed(global_seed, problem.id, replicate)
-            tasks.setdefault(_key(str(problem.id), seed, params), (problem, replicate, seed))
+            for run in range(runs) if runs is not None else [None]:
+                seed = task_seed(global_seed, problem.id, replicate, run)
+                task = (problem, replicate, run, seed)
+                key = _key(str(problem.id), global_seed, replicate, run, params)
+                tasks.setdefault(key, task)
+    columns = _key_columns(params, runs is not None)
     keys = list(tasks)
     with store.lock(results, analysis):
         table = store.load(results, analysis)
-        done = set(_table_keys(table, params))
+        done = set(_table_keys(table, columns))
         todo = [task for key, task in tasks.items() if key not in done]
         _log(log, f"{analysis}: {len(tasks) - len(todo)} cached, {len(todo)} to compute")
         if todo:
             table = _execute(
-                analysis, todo, compute, params, results, table, n_jobs, flush_seconds, log
+                analysis,
+                todo,
+                compute,
+                params,
+                results,
+                table,
+                n_jobs,
+                global_seed,
+                flush_seconds,
+                log,
             )
-    index = {key: i for i, key in enumerate(_table_keys(table, params))}
+    index = {key: i for i, key in enumerate(_table_keys(table, columns))}
     return table.iloc[[index[key] for key in keys]].reset_index(drop=True)
 
 
-def task_seed(global_seed: int, problem_id: ProblemId, replicate: int) -> int:
+def task_seed(
+    global_seed: int, problem_id: ProblemId, replicate: int, run: int | None = None
+) -> int:
     """Seed of one task, derived with ``numpy.random.SeedSequence``.
 
     The problem id enters through the first 8 bytes of its SHA-256 digest (the built-in
-    ``hash`` changes between processes).
+    ``hash`` changes between processes). The seed of a ``run`` comes from child ``run``
+    of the replicate's sequence, as lonkit seeds its runs.
     """
     digest = hashlib.sha256(str(problem_id).encode()).digest()
-    entropy = [global_seed, int.from_bytes(digest[:8], "little"), replicate]
-    return int(np.random.SeedSequence(entropy).generate_state(1)[0])
+    sequence = np.random.SeedSequence(
+        [global_seed, int.from_bytes(digest[:8], "little"), replicate]
+    )
+    if run is not None:
+        sequence = sequence.spawn(run + 1)[run]
+    return int(sequence.generate_state(1)[0])
 
 
 def _execute(
     analysis: str,
-    todo: list[tuple[Problem, int, int]],
+    todo: list[tuple[Problem, int, int | None, int]],
     compute: Compute,
     params: Mapping[str, Any],
     results: Path,
     table: pd.DataFrame,
     n_jobs: int,
+    global_seed: int,
     flush_seconds: float,
     log: Callable[[str], None] | None,
 ) -> pd.DataFrame:
@@ -142,9 +170,12 @@ def _execute(
             with joblib.parallel_config(backend="loky", inner_max_num_threads=1):
                 rows = joblib.Parallel(n_jobs=n_jobs, return_as="generator_unordered")(
                     joblib.delayed(_run_task)(
-                        compute, problem, seed, _meta(problem, replicate, seed, params, versions)
+                        compute,
+                        problem,
+                        seed,
+                        _meta(problem, replicate, run, global_seed, seed, params, versions),
                     )
-                    for problem, replicate, seed in todo
+                    for problem, replicate, run, seed in todo
                 )
                 for row in rows:
                     new_rows.append(row)
@@ -165,6 +196,8 @@ def _run_task(
 def _meta(
     problem: Problem,
     replicate: int,
+    run: int | None,
+    global_seed: int,
     seed: int,
     params: Mapping[str, Any],
     versions: Mapping[str, str],
@@ -176,18 +209,29 @@ def _meta(
         "instance": problem.id.instance,
         "dimension": problem.id.dimension,
         "replicate": replicate,
+        **({} if run is None else {"run": run}),
+        "global_seed": global_seed,
         "seed": seed,
         **params,
         **versions,
     }
 
 
-def _key(problem: str, seed: int, params: Mapping[str, Any]) -> tuple[Any, ...]:
-    return (problem, seed, *params.values())
+def _key(
+    problem: str, global_seed: int, replicate: int, run: int | None, params: Mapping[str, Any]
+) -> tuple[Any, ...]:
+    """Identity of a task, in the order of :func:`_key_columns`."""
+    runs = () if run is None else (run,)
+    return (problem, global_seed, replicate, *runs, *params.values())
 
 
-def _table_keys(table: pd.DataFrame, params: Mapping[str, Any]) -> Iterator[tuple[Any, ...]]:
-    columns = ["problem", "seed", *params]
+def _key_columns(params: Mapping[str, Any], runs: bool) -> list[str]:
+    """Table columns that identify a task."""
+    return ["problem", "global_seed", "replicate", *(["run"] if runs else []), *params]
+
+
+def _table_keys(table: pd.DataFrame, columns: Sequence[str]) -> Iterator[tuple[Any, ...]]:
+    """Task identity of every row; none for a table without all ``columns``."""
     if table.empty or any(column not in table for column in columns):
         return iter(())
     return zip(*(table[column].tolist() for column in columns), strict=True)

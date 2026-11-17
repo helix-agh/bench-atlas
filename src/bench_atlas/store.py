@@ -4,10 +4,11 @@ Each analysis (``ela``, ``lon``, ...) is a single table ``<results>/<analysis>.p
 Saving rewrites the whole file through a temporary file and an atomic rename, so the
 table on disk is always complete. A lock file guards against two runs writing the same
 table at once, which would lose rows, so one analysis in one results folder is written
-by one run (one node) at a time.
+by one run (one node) at a time. CMLON graphs are stored as GraphML files in
+``<results>/cmlon/``, written the same way.
 
-The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, seed
-and analysis settings match. Neither the analysis code nor the library versions are
+The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, global
+seed, replicate, run and analysis settings match. Neither the analysis code nor the library versions are
 part of that key: the versions are recorded in ``version_*`` columns, and :func:`load`
 warns if a table mixes them. After a change to the analysis code, start from a fresh
 results folder or delete ``<results>/<analysis>.parquet``.
@@ -15,6 +16,7 @@ results folder or delete ``<results>/<analysis>.parquet``.
 
 from __future__ import annotations
 
+import math
 import os
 import socket
 import warnings
@@ -22,11 +24,25 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
+import igraph as ig
 import pandas as pd
+from lonkit import CMLON
 
-__all__ = ["LockedError", "load", "load_all", "lock", "path", "save"]
+__all__ = [
+    "LockedError",
+    "cmlon_path",
+    "load",
+    "load_all",
+    "load_cmlon",
+    "lock",
+    "path",
+    "save",
+    "save_cmlon",
+]
 
 VERSION_PREFIX = "version_"
+CMLON_FOLDER = "cmlon"
+_CMLON_ATTRIBUTES = ("best_fitness", "eq_atol", "minimize")
 
 
 class LockedError(RuntimeError):
@@ -103,3 +119,47 @@ def lock(results: Path, analysis: str) -> Generator[None, None, None]:
 def path(results: Path, analysis: str) -> Path:
     """Location of the ``analysis`` table."""
     return Path(results) / f"{analysis}.parquet"
+
+
+def save_cmlon(results: Path, name: str, cmlon: CMLON) -> Path:
+    """Write ``cmlon`` to ``<results>/cmlon/<name>.graphml`` atomically.
+
+    GraphML keeps the vertex ``name``, ``Fitness`` and ``Count`` and the edge
+    ``Count``; ``best_fitness``, ``eq_atol`` and ``minimize`` are stored as graph
+    attributes, so :func:`load_cmlon` restores everything needed to plot the network.
+    """
+    file = cmlon_path(results, name)
+    file.parent.mkdir(parents=True, exist_ok=True)
+    graph = cmlon.graph.copy()
+    best = cmlon.best_fitness
+    graph["best_fitness"] = math.nan if best is None else float(best)
+    graph["eq_atol"] = float(cmlon.eq_atol)
+    graph["minimize"] = int(cmlon.minimize)
+    temporary = file.with_name(file.name + ".tmp")
+    graph.write_graphml(str(temporary))
+    temporary.replace(file)
+    return file
+
+
+def load_cmlon(results: Path, name: str) -> CMLON:
+    """CMLON saved by :func:`save_cmlon` (without its source LON)."""
+    graph = ig.Graph.Read_GraphML(str(cmlon_path(results, name)))
+    best, eq_atol, minimize = (graph[attribute] for attribute in _CMLON_ATTRIBUTES)
+    for attribute in _CMLON_ATTRIBUTES:
+        del graph[attribute]
+    if "id" in graph.vs.attributes():
+        del graph.vs["id"]
+    for sequence in (graph.vs, graph.es):
+        if "Count" in sequence.attributes():
+            sequence["Count"] = [int(count) for count in sequence["Count"]]
+    return CMLON(
+        graph=graph,
+        best_fitness=None if math.isnan(best) else best,
+        eq_atol=eq_atol,
+        minimize=bool(minimize),
+    )
+
+
+def cmlon_path(results: Path, name: str) -> Path:
+    """Location of the CMLON ``name``."""
+    return Path(results) / CMLON_FOLDER / f"{name}.graphml"
