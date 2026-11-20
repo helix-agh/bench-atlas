@@ -63,6 +63,7 @@ class Suite(enum.StrEnum):
     gnbg_i = "gnbg_i"
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
+    iohclustering = "iohclustering"
 
 
 # The atlas problem set: every command defaults to it, so features join per problem.
@@ -178,7 +179,7 @@ def _report_locked() -> Generator[None, None, None]:
 
 
 def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> list[Problem]:
-    """Problems of the suites; GNBG suites ignore dimensions and instances."""
+    """Problems of the suites; only BBOB and MA-BBOB take dimensions and instances."""
     problems = []
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob):

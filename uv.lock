@@ -39,6 +39,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "ioh" },
+    { name = "iohclustering" },
     { name = "joblib" },
     { name = "lonkit" },
     { name = "matplotlib" },
@@ -64,6 +65,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "ioh", specifier = ">=0.3.22" },
+    { name = "iohclustering", specifier = "==0.0.3" },
     { name = "joblib", specifier = ">=1.4.0" },
     { name = "lonkit", specifier = ">=0.9.0" },
     { name = "matplotlib", specifier = ">=3.7.0" },
@@ -494,6 +496,20 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e2/35/949fc370594e9bb9c937888c92ea53e9e04dbcf1fa80c7e6a60a00ad0e78/ioh-0.3.22-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2b56d033d2efe0501cb76851eb4bf6f7031bf01512350006cf25026e3f036add", size = 8605274, upload-time = "2025-09-26T10:18:24.169Z" },
     { url = "https://files.pythonhosted.org/packages/84/87/3fa26e99673244d811d10b45b0e1d48209ec8c8e2721fc1ca29186226002/ioh-0.3.22-cp312-cp312-win32.whl", hash = "sha256:31e16a60044a7473433ce64439e1388691b3f701ca39d89cfe939ede11ba260f", size = 8095039, upload-time = "2025-09-26T10:18:26.34Z" },
     { url = "https://files.pythonhosted.org/packages/f5/05/c1983f506511d45e950f5212d37a57ec8587f54b2d11abd8acd7a3a83e4f/ioh-0.3.22-cp312-cp312-win_amd64.whl", hash = "sha256:4a1da06186428cbb3ed0afb9db6dbb3bf771a3e0f4e90c4a5d564dc5158cec14", size = 8206836, upload-time = "2025-09-26T10:18:28.298Z" },
+]
+
+[[package]]
+name = "iohclustering"
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ioh" },
+    { name = "numpy" },
+    { name = "pandas" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ca/ea/f82a8bc144615d4622658e99026cedabdc99c2289e1398c672809cf90302/iohclustering-0.0.3.tar.gz", hash = "sha256:b1e9a762a26df843f67a4de74f2fb30d86630020dba108e702759ea2dd9b0fac", size = 72729, upload-time = "2025-04-29T12:17:58.825Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/04/d0c27cc8775d62ae065d6ca06d09e7986c5e1909973aa96a415a91ff1628/iohclustering-0.0.3-py3-none-any.whl", hash = "sha256:f91acabc40e319ea057110e1eacad7e775ec0e917f97d8635260ae8ddea7f247", size = 72014, upload-time = "2025-04-29T12:17:57.508Z" },
 ]
 
 [[package]]
