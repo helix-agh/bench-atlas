@@ -6,7 +6,7 @@ import socket
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import joblib
 import pandas as pd
@@ -65,28 +65,47 @@ class Suite(enum.StrEnum):
     gnbg_iii = "gnbg_iii"
 
 
+# The atlas problem set: every command defaults to it, so features join per problem.
+DIMENSIONS = [2, 5, 10, 20, 40]
+INSTANCES = [1, 2, 3, 4, 5]
+# Protocol decision: LON is too expensive above d = 10, so the LON atlas covers
+# d <= 10 and instance 1 only.
+LON_DIMENSIONS = [d for d in DIMENSIONS if d <= 10]
+LON_INSTANCES = INSTANCES[:1]
+
+Suites = Annotated[list[Suite], typer.Argument(help="Benchmark suites.")]
+Dimensions = Annotated[
+    list[int], typer.Option("--dimension", "-d", help="Dimensions of BBOB and MA-BBOB.")
+]
+Instances = Annotated[
+    list[int], typer.Option("--instance", "-i", help="Instances of BBOB and MA-BBOB.")
+]
+Results = Annotated[
+    Path, typer.Option("--results", "-o", help="Results folder, one Parquet file per analysis.")
+]
+Jobs = Annotated[
+    int,
+    typer.Option("--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."),
+]
+Seed = Annotated[
+    int, typer.Option("--seed", "-s", help="Global seed from which the task seeds are derived.")
+]
+
+
 @app.command()
 def ela(
-    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
-    dimension: list[int] = typer.Option(
-        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
-    ),
-    instance: list[int] = typer.Option(
-        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
-    ),
+    suite: Suites,
+    dimension: Dimensions = DIMENSIONS,
+    instance: Instances = INSTANCES,
     points_per_dimension: int = typer.Option(
         50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
     ),
     replicates: int = typer.Option(
         10, "--replicates", "-r", min=1, help="Independent Sobol samples per problem."
     ),
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
-    jobs: int = typer.Option(
-        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
-    ),
-    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the sample seeds."),
+    results: Results = Path("results"),
+    jobs: Jobs = 1,
+    seed: Seed = 0,
 ) -> None:
     """Compute ELA features.
 
@@ -165,13 +184,9 @@ def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> 
 
 @app.command()
 def lon(
-    suite: list[Suite] = typer.Argument(..., help="Suites to analyse."),
-    dimension: list[int] = typer.Option(
-        [2, 5, 10], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
-    ),
-    instance: list[int] = typer.Option(
-        [1], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
-    ),
+    suite: Suites,
+    dimension: Dimensions = LON_DIMENSIONS,
+    instance: Instances = LON_INSTANCES,
     replicates: int = typer.Option(
         1, "--replicates", "-r", min=1, help="Basin-hopping samples per problem."
     ),
@@ -194,13 +209,9 @@ def lon(
         min=0,
         help="Decimals of the fitness of an optimum.",
     ),
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
-    jobs: int = typer.Option(
-        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
-    ),
-    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the sampling seeds."),
+    results: Results = Path("results"),
+    jobs: Jobs = 1,
+    seed: Seed = 0,
 ) -> None:
     """Build local optima networks and compute LON metrics.
 
@@ -213,6 +224,9 @@ def lon(
     problem id, ``replicate``, ``global_seed``, ``seed``, the settings, library versions, the
     evaluations used, the number of runs, the lonkit CMLON metrics and ``cmlon``, the
     graph name. GNBG suites have a fixed d = 30 and one instance.
+
+    By default only d <= 10 and instance 1 (the LON atlas): LON is too expensive
+    for the larger dimensions of the other analyses.
     """
     settings = lon_pipeline.Settings(
         runs=runs,
@@ -235,19 +249,13 @@ def lon(
 
 @app.command()
 def timing(
-    suite: list[Suite] = typer.Argument(..., help="Suites to measure."),
-    dimension: list[int] = typer.Option(
-        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
-    ),
+    suite: Suites,
+    dimension: Dimensions = DIMENSIONS,
     batch_size: list[int] = typer.Option(
         [1], "--batch-size", "-b", min=1, help="Points evaluated per call."
     ),
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
-    jobs: int = typer.Option(
-        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
-    ),
+    results: Results = Path("results"),
+    jobs: Jobs = 1,
 ) -> None:
     """Measure evaluation cost of benchmark problems.
 
@@ -304,13 +312,9 @@ def _check_optimizers(value: list[str]) -> list[str]:
 
 @app.command()
 def run(
-    suite: list[Suite] = typer.Argument(..., help="Suites to run on."),
-    dimension: list[int] = typer.Option(
-        [2, 5, 10, 20, 40], "--dimension", "-d", help="Dimensions of BBOB and MA-BBOB."
-    ),
-    instance: list[int] = typer.Option(
-        [1, 2, 3, 4, 5], "--instance", "-i", help="Instances of BBOB and MA-BBOB."
-    ),
+    suite: Suites,
+    dimension: Dimensions = DIMENSIONS,
+    instance: Instances = INSTANCES,
     replicates: int = typer.Option(
         RUN_REPLICATES, "--replicates", min=1, help="Runs per problem and optimizer."
     ),
@@ -328,13 +332,9 @@ def run(
         min=1,
         help="Evaluation budget of one run, per dimension.",
     ),
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
-    jobs: int = typer.Option(
-        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
-    ),
-    seed: int = typer.Option(0, "--seed", "-s", help="Global seed of the run seeds."),
+    results: Results = Path("results"),
+    jobs: Jobs = 1,
+    seed: Seed = 0,
 ) -> None:
     """Run the optimizer portfolio on benchmark problems.
 
@@ -367,9 +367,7 @@ def run(
 
 @app.command()
 def ioh_logs(
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
+    results: Results = Path("results"),
     suite: list[Suite] | None = typer.Option(
         None, "--suite", help="Suites to log; all suites in the runs by default."
     ),
@@ -383,9 +381,7 @@ def ioh_logs(
         min=1,
         help="Budget per dimension of the runs to log.",
     ),
-    jobs: int = typer.Option(
-        1, "--jobs", "-j", callback=_check_jobs, help="Parallel jobs; -1 uses all CPUs."
-    ),
+    jobs: Jobs = 1,
 ) -> None:
     """Write IOH logs of the optimizer portfolio runs.
 
@@ -413,9 +409,7 @@ def ioh_logs(
 
 @app.command()
 def aocc(
-    results: Path = typer.Option(
-        Path("results"), "--results", "-o", help="Results folder, one Parquet file per analysis."
-    ),
+    results: Results = Path("results"),
     at: list[int] = typer.Option(
         list(aocc_module.BUDGETS_PER_DIMENSION),
         "--at",
