@@ -93,14 +93,17 @@ def ela(
     Adds one row per problem and replicate (0 to ``--replicates`` - 1) to
     ``<results>/ela.parquet``, skipping rows that are already there, and prints the
     requested rows as CSV. Each replicate's Sobol sample seed is derived from
-    ``--seed``, the problem id and the replicate, not from the number of replicates,
-    so raising ``--replicates`` computes only the new ones. Rows hold the problem id,
+    ``--seed``, the dimension and the replicate, not from the problem or the number of
+    replicates: replicate r of every problem of dimension d is evaluated on the same
+    sample, so differences between problems are not sampling noise, and raising
+    ``--replicates`` computes only the new ones. Rows hold the problem id,
     ``replicate``, ``seed``, ``points_per_dimension``, library versions, ``f_med``
     and all orivex features. GNBG suites have a fixed d = 30 and one instance.
 
     Stored rows are reused by problem, seed and settings only, not by the version
     of the analysis code: after changing the code, use a fresh ``--results`` folder
-    or delete ``<results>/ela.parquet``.
+    or delete ``<results>/ela.parquet``. Tables written before the sample was shared
+    across problems (one sample per problem id) are invalid.
     """
     table = _run(
         "ela",
@@ -111,6 +114,7 @@ def ela(
         results,
         jobs,
         seed,
+        seed_per_dimension=True,
     )
     typer.echo(table.to_csv(index=False), nl=False)
 
@@ -125,6 +129,7 @@ def _run(
     jobs: int,
     seed: int = 0,
     variants: Sequence[Mapping[str, Any]] | None = None,
+    seed_per_dimension: bool = False,
 ) -> pd.DataFrame:
     """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
     with _report_locked():
@@ -139,6 +144,7 @@ def _run(
             global_seed=seed,
             log=functools.partial(typer.echo, err=True),
             variants=variants,
+            seed_per_dimension=seed_per_dimension,
         )
 
 

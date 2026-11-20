@@ -4,12 +4,13 @@ One task is (problem, replicate), or (problem, replicate, run) for analyses that
 a replicate into independent runs, repeated for every variant of the analysis settings
 (e.g. every optimizer). Its seed is derived from a global seed, the problem id, the
 replicate and the run (:func:`task_seed`), never from task order or worker, so results
-don't depend on ``n_jobs``. A task is identified by the problem, the global seed, the
-replicate, the run, the analysis settings and the variant, not by its seed: seeds are
-32-bit, so two tasks may share one. Tasks run with joblib, each with single-threaded BLAS /
-OpenMP. Finished rows are added to the analysis table of the results store
-(:mod:`bench_atlas.store`); tasks already in the table are skipped, so an
-interrupted run resumes where it stopped.
+don't depend on ``n_jobs``. With ``seed_per_dimension`` the problem's dimension replaces
+its id, so all problems of one dimension share the seeds (e.g. one ELA sample). A task
+is identified by the problem, the global seed, the replicate, the run, the analysis
+settings and the variant, not by its seed: seeds are 32-bit, so two tasks may share one.
+Tasks run with joblib, each with single-threaded BLAS / OpenMP. Finished rows are added
+to the analysis table of the results store (:mod:`bench_atlas.store`); tasks already in
+the table are skipped, so an interrupted run resumes where it stopped.
 """
 
 from __future__ import annotations
@@ -53,6 +54,7 @@ def run(
     log: Callable[[str], None] | None = None,
     runs: int | None = None,
     variants: Sequence[Mapping[str, Any]] | None = None,
+    seed_per_dimension: bool = False,
 ) -> pd.DataFrame:
     """Rows of ``analysis`` for every problem and replicate, computing only missing ones.
 
@@ -83,6 +85,8 @@ def run(
             key (e.g. ``[{"optimizer": "CMAstd"}, {"optimizer": "PSO"}]``). All
             variants have the same keys, distinct from those of ``params``. The
             variants of a task share its seed, and they all go to one worker pool.
+        seed_per_dimension: Derive seeds from the dimension instead of the problem id,
+            so every problem of a dimension gets the same seed per replicate and run.
 
     Returns:
         The requested rows in problem, replicate, run, then variant order, without
@@ -93,7 +97,8 @@ def run(
     for problem in problems:
         for replicate in replicates:
             for run in range(runs) if runs is not None else [None]:
-                seed = task_seed(global_seed, problem.id, replicate, run)
+                seed_key = f"d{problem.dimension}" if seed_per_dimension else problem.id
+                seed = task_seed(global_seed, seed_key, replicate, run)
                 for variant in variants:
                     settings = {**params, **variant}
                     key = _key(str(problem.id), global_seed, replicate, run, settings)
@@ -124,15 +129,16 @@ def run(
 
 
 def task_seed(
-    global_seed: int, problem_id: ProblemId, replicate: int, run: int | None = None
+    global_seed: int, key: ProblemId | str, replicate: int, run: int | None = None
 ) -> int:
     """Seed of one task, derived with ``numpy.random.SeedSequence``.
 
-    The problem id enters through the first 8 bytes of its SHA-256 digest (the built-in
-    ``hash`` changes between processes). The seed of a ``run`` comes from child ``run``
-    of the replicate's sequence, as lonkit seeds its runs.
+    ``key`` is the problem id, or ``d<dimension>`` for seeds shared by all problems of
+    a dimension. It enters through the first 8 bytes of the SHA-256 digest of its string
+    (the built-in ``hash`` changes between processes). The seed of a ``run`` comes from
+    child ``run`` of the replicate's sequence, as lonkit seeds its runs.
     """
-    digest = hashlib.sha256(str(problem_id).encode()).digest()
+    digest = hashlib.sha256(str(key).encode()).digest()
     sequence = np.random.SeedSequence(
         [global_seed, int.from_bytes(digest[:8], "little"), replicate]
     )

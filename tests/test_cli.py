@@ -92,6 +92,8 @@ def test_ela_stores_and_reuses_results(tmp_path: Path) -> None:
     assert first.exit_code == 0
     stored = pd.read_parquet(tmp_path / "ela.parquet")
     assert len(stored) == 24 * 10
+    assert (stored.groupby("replicate")["seed"].nunique() == 1).all()
+    assert stored["seed"].nunique() == 10
     again = runner.invoke(app, args)
     assert again.exit_code == 0
     assert "240 cached, 0 to compute" in again.stderr
