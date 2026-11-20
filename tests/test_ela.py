@@ -36,3 +36,17 @@ def test_objective_values_are_minmax_normalized() -> None:
     features, features_scaled = ela_features(problem, 0), ela_features(scaled, 0)
     assert features_scaled.pop("f_med") == pytest.approx(1000 * features.pop("f_med") + 7)
     assert features_scaled == pytest.approx(features, rel=1e-9, abs=1e-12)
+
+
+def test_sample_depends_only_on_the_seed_and_dimension() -> None:
+    samples: list[np.ndarray] = []
+
+    def record(x: np.ndarray) -> np.ndarray:
+        samples.append(x.copy())
+        return _sphere(x)
+
+    for function in (1, 2):
+        ela_features(Problem(ProblemId("test", function, 1, 3), record), seed=5)
+    ela_features(Problem(ProblemId("test", 1, 1, 3), record), seed=6)
+    assert np.array_equal(samples[0], samples[1])
+    assert not np.array_equal(samples[0], samples[2])

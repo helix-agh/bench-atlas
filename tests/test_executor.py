@@ -227,6 +227,29 @@ def test_task_seed_of_runs() -> None:
     assert executor.task_seed(0, problem_id, 0) not in seeds
 
 
+def test_seed_per_dimension(tmp_path: Path) -> None:
+    problems = [Problem(ProblemId("test", f, 1, d), _sphere) for d in (2, 3) for f in (1, 2)]
+    table = executor.run(
+        "test", problems, range(2), _seed_feature, {}, tmp_path, seed_per_dimension=True
+    )
+    seeds = table.groupby(["dimension", "replicate"])["seed"].agg(["nunique", "first"])
+    assert (seeds["nunique"] == 1).all()
+    assert seeds["first"].nunique() == 4
+    assert table["seed"].iloc[0] == executor.task_seed(0, "d2", 0)
+    reversed_order = executor.run(
+        "test",
+        problems[::-1],
+        range(2),
+        _seed_feature,
+        {},
+        tmp_path / "reversed",
+        seed_per_dimension=True,
+    )
+    pd.testing.assert_frame_equal(
+        table, reversed_order.sort_values(["dimension", "function", "replicate"], ignore_index=True)
+    )
+
+
 def test_runs_are_separate_tasks(tmp_path: Path) -> None:
     messages: list[str] = []
     table = _run(tmp_path, runs=3, log=messages.append)
