@@ -25,6 +25,7 @@ from collections.abc import Iterable, Sequence
 import numpy as np
 import pandas as pd
 
+from bench_atlas.ela import POINTS_PER_DIMENSION as ELA_POINTS_PER_DIMENSION
 from bench_atlas.portfolio import best_so_far
 
 __all__ = [
@@ -38,7 +39,6 @@ __all__ = [
 
 PRECISION = 1e-8
 BUDGETS_PER_DIMENSION = (100, 300, 1000)
-ELA_POINTS_PER_DIMENSION = 50
 
 _RUN_COLUMNS = [
     "problem",

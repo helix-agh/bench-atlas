@@ -16,7 +16,7 @@ from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, s
 from bench_atlas import aocc as aocc_module
 from bench_atlas import ioh_logs as ioh_logs_module
 from bench_atlas import lon as lon_module
-from bench_atlas.ela import ela_features
+from bench_atlas.ela import POINTS_PER_DIMENSION, ela_features
 from bench_atlas.problems import Problem
 from bench_atlas.timing import timing_features
 
@@ -98,7 +98,11 @@ def ela(
     dimension: Dimensions = DIMENSIONS,
     instance: Instances = INSTANCES,
     points_per_dimension: int = typer.Option(
-        50, "--points-per-dimension", "-n", min=1, help="Sample size per dimension."
+        POINTS_PER_DIMENSION,
+        "--points-per-dimension",
+        "-n",
+        min=1,
+        help="Sample size per dimension (250·d by default, see issue #41).",
     ),
     replicates: int = typer.Option(
         10, "--replicates", "-r", min=1, help="Independent Sobol samples per problem."

@@ -72,7 +72,9 @@ def _run(problem: str, optimizer: str, f_opt: float, curve: tuple[list, list]) -
     }
 
 
-def _ela(problem: str, f_meds: list[float], points_per_dimension: int = 50) -> list[dict]:
+def _ela(
+    problem: str, f_meds: list[float], points_per_dimension: int = aocc.ELA_POINTS_PER_DIMENSION
+) -> list[dict]:
     return [
         {
             "problem": problem,
