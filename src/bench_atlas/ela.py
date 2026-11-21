@@ -10,10 +10,15 @@ from scipy.stats import qmc
 
 from bench_atlas.problems import Problem
 
-__all__ = ["ela_features"]
+__all__ = ["POINTS_PER_DIMENSION", "ela_features"]
+
+# Why 250·d: issues #24, #41.
+POINTS_PER_DIMENSION = 250
 
 
-def ela_features(problem: Problem, seed: int, points_per_dimension: int = 50) -> dict[str, float]:
+def ela_features(
+    problem: Problem, seed: int, points_per_dimension: int = POINTS_PER_DIMENSION
+) -> dict[str, float]:
     """All orivex ELA features of ``problem`` on one Sobol sample.
 
     The sample has ``points_per_dimension * d`` scrambled Sobol points on
