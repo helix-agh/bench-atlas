@@ -9,18 +9,25 @@ The portfolio (:data:`PORTFOLIO`) has one optimizer per method class:
 
 - ``CMAstd``: CMA-ES with full covariance, non-elitist, default population size. It
   starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`); with Nevergrad's
-  default of 0.024 it would be a local search from the centre. (Nevergrad's
-  ``CMA`` is not used: on a bounded domain it selects an elitist diagonal CMA-ES with
-  a small population.)
+  default of 0.024 it would be a local search from the centre. (Nevergrad's ``CMA`` is
+  not used: on a bounded domain it selects an elitist diagonal CMA-ES with a small
+  population.)
 - ``LBFGSB``: L-BFGS-B, a quasi-Newton method, with random restarts.
 - ``RPowell``: Powell's direction-set method with random restarts.
+- ``TwoPointsDE``: differential evolution.
+- ``RealSpacePSO``: particle swarm optimization. (Nevergrad's ``PSO`` is not used: it
+  moves particles in an arctan-transformed space, so on [0, 1]^d most of its points
+  lie on the boundary.)
 
-Each of the three is the best optimizer on a different part of the benchmark
-problems. Other Nevergrad optimizers, such as differential evolution, particle swarm,
-diagonal CMA-ES or random search, barely improved on the best of these three, so they
-are not in the portfolio; they can still be run by name. The portfolio is identified
-by its optimizer names and the Nevergrad version, which the executor records in every
-row.
+The first three are each the best optimizer on a different part of the benchmark
+problems. The population-based ``TwoPointsDE`` and ``RealSpacePSO`` rarely are, but
+how well they do relative to the others differs between problems, which makes the
+portfolio's results a finer measure of problem similarity. Any other Nevergrad
+optimizer can still be run by name. The portfolio is identified by its optimizer
+names and the Nevergrad version, which the executor records in every row.
+
+Sampling, e.g. of initial populations, is uniform on [0, 1]^d (:func:`unit_box`);
+Nevergrad's bounded ``Array`` samples around the centre.
 """
 
 from __future__ import annotations
@@ -73,6 +80,8 @@ def _cmastd(parametrization: ng.p.Array, budget: int, num_workers: int) -> Optim
 
 PORTFOLIO: dict[str, OptimizerClass] = {
     "CMAstd": _cmastd,
+    "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
+    "RealSpacePSO": ng.optimizers.registry["RealSpacePSO"],
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
     "RPowell": ng.optimizers.registry["RPowell"],
 }
