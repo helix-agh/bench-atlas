@@ -39,6 +39,7 @@ dependencies = [
     "typer>=0.12.0",
     "scipy>=1.10",
     "threadpoolctl>=3.1",
+    "iohclustering==0.0.3",
 ]
 
 [project.scripts]
