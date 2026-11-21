@@ -5,26 +5,22 @@ and returns its best-so-far curve, stored as the evaluations at which the best v
 improved. The curve is lossless and much shorter than one value per evaluation;
 :func:`best_so_far` expands it, e.g. to compute AOCC at several budgets.
 
-The portfolio (:data:`PORTFOLIO`) has three members, one per method class: CMA-ES
-(``CMAstd``), quasi-Newton (``LBFGSB``) and direction-set search (``RPowell``). It is
-frozen by its optimizer names and the Nevergrad version, which the executor records in
-every row. Each member carries the virtual best solver somewhere: on BBOB, MA-BBOB
-(d = 2, 3), IOHClustering and GNBG I-III (d = 30) at 100 * d and 1000 * d evaluations,
-dropping one costs up to 25 % (``CMAstd``), 37 % (``LBFGSB``) or 19 % (``RPowell``) of
-it. Other candidates were dropped because the virtual best solver loses at most 0.004
-AOCC without each of them (``TwoPointsDE``, ``RealSpacePSO``, ``RandomSearch``) or
-0.025 (``DiagonalCMA``, on IOHClustering only); the AOCC normalization by ``f_med``
-already compares every run with uniform random sampling. Nevergrad's ``CMA`` is not
-used as is: on a bounded domain it selects ``CMAbounded``, an elitist diagonal CMA-ES
-with a small population. ``CMAstd`` (what ``CMA`` selects without bounds) is the
-full-covariance, non-elitist CMA-ES with the default population.
+The portfolio (:data:`PORTFOLIO`) has one optimizer per method class:
 
-Two settings differ from Nevergrad's defaults:
+- ``CMAstd``: CMA-ES with full covariance, non-elitist, default population size. It
+  starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`); with Nevergrad's
+  default of 0.024 it would be a local search from the centre. (Nevergrad's
+  ``CMA`` is not used: on a bounded domain it selects an elitist diagonal CMA-ES with
+  a small population.)
+- ``LBFGSB``: L-BFGS-B, a quasi-Newton method, with random restarts.
+- ``RPowell``: Powell's direction-set method with random restarts.
 
-- Sampling is uniform on [0, 1]^d (:func:`unit_box`), for optimizers run by name;
-  Nevergrad's bounded ``Array`` samples around the centre.
-- ``CMAstd`` starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`) instead
-  of Nevergrad's 0.024, with which it is a local search from the centre.
+Each of the three is the best optimizer on a different part of the benchmark
+problems. Other Nevergrad optimizers, such as differential evolution, particle swarm,
+diagonal CMA-ES or random search, barely improved on the best of these three, so they
+are not in the portfolio; they can still be run by name. The portfolio is identified
+by its optimizer names and the Nevergrad version, which the executor records in every
+row.
 """
 
 from __future__ import annotations
