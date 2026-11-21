@@ -9,7 +9,7 @@ from bench_atlas.problems import Problem, ProblemId, from_unit
 from bench_atlas.suites import cec2022
 
 REFERENCE = np.load(Path(__file__).parent / "data" / "cec2022_reference.npz")
-FUNCTIONS = [1, 2, 4, 6, 7, 8, 10, 11, 12]
+DIFFER_FROM_CODE = (3, 5, 9)  # IOH follows the technical report, not the code
 
 
 def uniform(function: int, d: int, n: int) -> np.ndarray:
@@ -29,7 +29,7 @@ def problems() -> list[Problem]:
 
 def test_ids(problems: list[Problem]) -> None:
     assert [problem.id for problem in problems] == [
-        ProblemId("cec2022", 1000 + f, 1, d) for f in FUNCTIONS for d in (10, 20)
+        ProblemId("cec2022", 1000 + f, 1, d) for f in range(1, 13) for d in (10, 20)
     ]
     with pytest.raises(ValueError, match="dimensions"):
         cec2022([2, 10])
@@ -46,14 +46,14 @@ def test_identical_to_ioh(problems: list[Problem]) -> None:
 @pytest.mark.parametrize("function", range(1, 13))
 def test_ioh_matches_official_code(function: int, d: int) -> None:
     # Values of the official C code; see tests/data/make_cec2022_reference.py. For F3, F5
-    # and F9 ioh 0.3.22 follows the technical report, not the code, so cec2022() drops
-    # them; if this branch fails, IOH has changed and they can be added back.
+    # and F9 ioh 0.3.22 follows the technical report, not the code (see cec2022()); if
+    # that branch fails, IOH has changed and the docstring needs updating.
     problem, key = raw(function, d), f"f{function}_d{d}"
     x = np.vstack([REFERENCE[f"{key}_x"], -100 + 200 * uniform(function, d, 100)])
     y = np.concatenate([REFERENCE[f"{key}_y"], REFERENCE[f"{key}_uniform_y"]])
     values = np.array([problem(xi) for xi in x])
     assert np.array_equal(x[0], problem.optimum.x) and values[0] == y[0] == problem.optimum.y
-    if function in FUNCTIONS:
+    if function not in DIFFER_FROM_CODE:
         np.testing.assert_allclose(values, y, rtol=1e-12)
     else:
         assert np.max(np.abs(values - y) / y) > 1e-3

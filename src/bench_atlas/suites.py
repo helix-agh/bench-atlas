@@ -41,13 +41,14 @@ def ma_bbob(dimensions: Iterable[int], instances: Iterable[int]) -> list[Problem
 
 
 def cec2022(dimensions: Iterable[int]) -> list[Problem]:
-    """CEC 2022 functions F1-F12 except F3, F5 and F9, for d in {10, 20} (from IOH).
+    """CEC 2022 functions F1-F12 for d in {10, 20}, as implemented in IOH.
 
-    IOH problem ids are 1000 + F. For F3 (Schaffer F7), F5 (Levy) and F9
+    IOH problem ids are 1000 + F. Caveat: for F3 (Schaffer F7), F5 (Levy) and F9
     (composition 1), the official CEC 2022 code (used in the competition) differs
     from its technical report, and ioh 0.3.22 follows the report: it scales F3 by
     0.5/100 and F5 by 5.12/100 instead of 1, and does not rotate the second
-    component of F9. We follow the code, so these three are left out.
+    component of F9. These three are therefore not the functions of the
+    competition; the other nine match the official code.
 
     The suite is defined only for d = 10 and 20. There is one shift and rotation
     per function and d, as in the official code: IOH ignores the instance number,
@@ -58,6 +59,6 @@ def cec2022(dimensions: Iterable[int]) -> list[Problem]:
         raise ValueError(f"CEC 2022 has no dimensions {unsupported}; available: [10, 20]")
     return [
         from_ioh(ioh.get_problem(1000 + f, 1, dimension, ioh.ProblemClass.CEC2022), "cec2022")
-        for f in (1, 2, 4, 6, 7, 8, 10, 11, 12)
+        for f in range(1, 13)
         for dimension in dimensions
     ]
