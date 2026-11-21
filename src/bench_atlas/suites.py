@@ -9,8 +9,9 @@ import ioh
 
 from bench_atlas.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.problems import Problem, from_ioh
+from bench_atlas.zigzag import zigzag
 
-__all__ = ["bbob", "cec2022", "gnbg_i", "gnbg_ii", "gnbg_iii", "ma_bbob"]
+__all__ = ["bbob", "cec2022", "gnbg_i", "gnbg_ii", "gnbg_iii", "ma_bbob", "zigzag"]
 
 
 def bbob(dimensions: Iterable[int], instances: Iterable[int]) -> list[Problem]:
