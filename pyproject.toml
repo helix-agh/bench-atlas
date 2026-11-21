@@ -63,6 +63,7 @@ packages = ["src/bench_atlas"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+extend-exclude = ["src/bench_atlas/_portal"]  # vendored PORTAL code, kept unchanged
 
 [tool.ruff.lint]
 select = [

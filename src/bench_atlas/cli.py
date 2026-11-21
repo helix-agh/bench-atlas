@@ -64,6 +64,7 @@ class Suite(enum.StrEnum):
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
     iohclustering = "iohclustering"
+    portal = "portal"
 
 
 # The atlas problem set: every command defaults to it, so features join per problem.
