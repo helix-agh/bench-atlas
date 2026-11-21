@@ -12,3 +12,5 @@ htmlcov/
 .gstack/
 CLAUDE.md
 results/
+
+site/
