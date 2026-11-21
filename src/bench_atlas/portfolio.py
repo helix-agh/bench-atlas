@@ -5,14 +5,21 @@ and returns its best-so-far curve, stored as the evaluations at which the best v
 improved. The curve is lossless and much shorter than one value per evaluation;
 :func:`best_so_far` expands it, e.g. to compute AOCC at several budgets.
 
-The portfolio (:data:`PORTFOLIO`) covers different method classes. It is frozen by
-its optimizer names and the Nevergrad version, which the executor records in every
-row. Two choices differ from Nevergrad's plain names:
+The portfolio (:data:`PORTFOLIO`) has one member per method class: CMA-ES
+(``CMAstd``), quasi-Newton (``LBFGSB``), direction-set search (``RPowell``),
+differential evolution (``TwoPointsDE``) and particle swarm (``RealSpacePSO``). It is
+frozen by its optimizer names and the Nevergrad version, which the executor records in
+every row. On BBOB and GNBG I-III (d = 30, 1000 * d evaluations) ``TwoPointsDE`` and
+``RealSpacePSO`` never improve the virtual best solver; they stay as representatives
+of the DE and PSO classes, which most benchmarking papers include. ``DiagonalCMA`` and
+``RandomSearch`` were dropped there: without them the virtual best solver loses at most
+0.004 AOCC, and the AOCC normalization by ``f_med`` already compares every run with
+uniform random sampling. Two choices differ from Nevergrad's plain names:
 
 - ``CMAstd`` instead of ``CMA``. On a bounded domain Nevergrad's ``CMA`` selects
-  ``CMAbounded``, an elitist diagonal CMA-ES with a small population, so it would
-  nearly duplicate ``DiagonalCMA``. ``CMAstd`` (what ``CMA`` selects without bounds) is
-  the full-covariance, non-elitist CMA-ES with the default population.
+  ``CMAbounded``, an elitist diagonal CMA-ES with a small population. ``CMAstd`` (what
+  ``CMA`` selects without bounds) is the full-covariance, non-elitist CMA-ES with the
+  default population.
 - ``RealSpacePSO`` instead of ``PSO``. Nevergrad's ``PSO`` moves particles in an
   arctan-transformed space and puts out-of-range moves on the opposite bound, so on
   [0, 1]^d most of its points lie on the boundary (99.1 % on a shifted sphere in
@@ -21,8 +28,8 @@ row. Two choices differ from Nevergrad's plain names:
 
 Two settings differ from Nevergrad's defaults:
 
-- Sampling is uniform on [0, 1]^d (:func:`unit_box`), so ``RandomSearch`` is uniform
-  random search; Nevergrad's bounded ``Array`` samples around the centre.
+- Sampling is uniform on [0, 1]^d (:func:`unit_box`), e.g. for initial populations;
+  Nevergrad's bounded ``Array`` samples around the centre.
 - ``CMAstd`` starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`) instead
   of Nevergrad's 0.024, with which it is a local search from the centre.
 """
@@ -77,12 +84,10 @@ def _cmastd(parametrization: ng.p.Array, budget: int, num_workers: int) -> Optim
 
 PORTFOLIO: dict[str, OptimizerClass] = {
     "CMAstd": _cmastd,
-    "DiagonalCMA": ng.optimizers.registry["DiagonalCMA"],
     "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
     "RealSpacePSO": ng.optimizers.registry["RealSpacePSO"],
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
     "RPowell": ng.optimizers.registry["RPowell"],
-    "RandomSearch": ng.optimizers.registry["RandomSearch"],
 }
 
 

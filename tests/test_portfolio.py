@@ -75,12 +75,10 @@ def test_runs_depend_only_on_the_seed(name: str) -> None:
 def test_portfolio_names_are_stable() -> None:
     assert list(portfolio.PORTFOLIO) == [
         "CMAstd",
-        "DiagonalCMA",
         "TwoPointsDE",
         "RealSpacePSO",
         "LBFGSB",
         "RPowell",
-        "RandomSearch",
     ]
 
 
