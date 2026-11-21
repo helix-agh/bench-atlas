@@ -13,11 +13,11 @@ row. Two choices differ from Nevergrad's plain names:
   ``CMAbounded``, an elitist diagonal CMA-ES with a small population, so it would
   nearly duplicate ``DiagonalCMA``. ``CMAstd`` (what ``CMA`` selects without bounds) is
   the full-covariance, non-elitist CMA-ES with the default population.
-- ``RNelderMead`` instead of ``NelderMead``. Nevergrad's ``NelderMead`` ignores the
-  seed and, once the simplex has collapsed, restarts from the best point and evaluates
-  it over and over (on the sphere in d = 2, 92 % of 2000 evaluations repeat a point).
-  ``RNelderMead`` restarts from a random point, like Nevergrad's ``RPowell`` and
-  ``RCobyla``.
+- ``RealSpacePSO`` instead of ``PSO``. Nevergrad's ``PSO`` moves particles in an
+  arctan-transformed space and puts out-of-range moves on the opposite bound, so on
+  [0, 1]^d most of its points lie on the boundary (99.1 % on a shifted sphere in
+  d = 5) and it does worse than random search. ``RealSpacePSO`` is the same algorithm
+  without the transform.
 
 Two settings differ from Nevergrad's defaults:
 
@@ -37,7 +37,6 @@ import nevergrad as ng
 import numpy as np
 from nevergrad.optimization.base import ConfiguredOptimizer, Optimizer
 from nevergrad.optimization.optimizerlib import ParametrizedCMA
-from nevergrad.optimization.recastlib import NonObjectOptimizer
 
 from bench_atlas.problems import Problem
 
@@ -80,12 +79,8 @@ PORTFOLIO: dict[str, OptimizerClass] = {
     "CMAstd": _cmastd,
     "DiagonalCMA": ng.optimizers.registry["DiagonalCMA"],
     "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
-    "PSO": ng.optimizers.registry["PSO"],
-    "RNelderMead": NonObjectOptimizer(method="Nelder-Mead", random_restart=True).set_name(
-        "RNelderMead"
-    ),
+    "RealSpacePSO": ng.optimizers.registry["RealSpacePSO"],
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
-    "OnePlusOne": ng.optimizers.registry["OnePlusOne"],
     "RandomSearch": ng.optimizers.registry["RandomSearch"],
 }
 

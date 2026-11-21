@@ -77,10 +77,8 @@ def test_portfolio_names_are_stable() -> None:
         "CMAstd",
         "DiagonalCMA",
         "TwoPointsDE",
-        "PSO",
-        "RNelderMead",
+        "RealSpacePSO",
         "LBFGSB",
-        "OnePlusOne",
         "RandomSearch",
     ]
 
@@ -111,6 +109,21 @@ def test_mutation_steps_keep_nevergrads_sigma() -> None:
     assert portfolio.unit_box(3).sigma.value == pytest.approx(portfolio.SIGMA)
     steps = _asks("OnePlusOne", 2, 1000)[1:]
     assert steps.std() == pytest.approx(portfolio.SIGMA, abs=0.01)
+
+
+@pytest.mark.parametrize(("name", "on_bounds"), [("PSO", True), ("RealSpacePSO", False)])
+def test_pso_stays_off_the_bounds(name: str, on_bounds: bool) -> None:
+    points = []
+
+    def sphere(x: np.ndarray) -> np.ndarray:
+        points.append(x)
+        return _sphere(x)
+
+    problem = Problem(ProblemId("test", 1, 1, 5), sphere)
+    portfolio.optimize(problem, 0, name, budget_per_dimension=100)
+    x = np.concatenate(points)
+    fraction = np.mean(np.any((x == 0) | (x == 1), axis=1))
+    assert (fraction > 0.5) if on_bounds else (fraction < 0.05)
 
 
 def _cma(name: str, d: int):
