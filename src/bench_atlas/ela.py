@@ -12,12 +12,7 @@ from bench_atlas.problems import Problem
 
 __all__ = ["POINTS_PER_DIMENSION", "ela_features"]
 
-# 250·d, not the 50·d of algorithm selection (Kerschke et al. 2016), which matches the
-# cost of one EA initial population rather than feature stability. 250·d is the most
-# common size in papers that compare suites. At 50·d no feature subset identified 98 % of
-# BBOB functions for d <= 20, at 250·d one did (Renau et al. 2021), and small samples bias
-# the features, not only add noise (Belkhir et al. 2016). It also gives enough points for a q = 0.1 level-set split at d = 2 and for the
-# 861 coefficients of quad_w_interact at d = 40. Details and references: issues #24, #41.
+# Why 250·d: issues #24, #41.
 POINTS_PER_DIMENSION = 250
 
 
