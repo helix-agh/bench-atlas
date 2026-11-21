@@ -79,6 +79,7 @@ def test_portfolio_names_are_stable() -> None:
         "TwoPointsDE",
         "RealSpacePSO",
         "LBFGSB",
+        "RPowell",
         "RandomSearch",
     ]
 

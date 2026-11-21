@@ -81,6 +81,7 @@ PORTFOLIO: dict[str, OptimizerClass] = {
     "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
     "RealSpacePSO": ng.optimizers.registry["RealSpacePSO"],
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
+    "RPowell": ng.optimizers.registry["RPowell"],
     "RandomSearch": ng.optimizers.registry["RandomSearch"],
 }
 
