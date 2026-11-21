@@ -5,26 +5,29 @@ and returns its best-so-far curve, stored as the evaluations at which the best v
 improved. The curve is lossless and much shorter than one value per evaluation;
 :func:`best_so_far` expands it, e.g. to compute AOCC at several budgets.
 
-The portfolio (:data:`PORTFOLIO`) covers different method classes. It is frozen by
-its optimizer names and the Nevergrad version, which the executor records in every
-row. Two choices differ from Nevergrad's plain names:
+The portfolio (:data:`PORTFOLIO`) has one optimizer per method class:
 
-- ``CMAstd`` instead of ``CMA``. On a bounded domain Nevergrad's ``CMA`` selects
-  ``CMAbounded``, an elitist diagonal CMA-ES with a small population, so it would
-  nearly duplicate ``DiagonalCMA``. ``CMAstd`` (what ``CMA`` selects without bounds) is
-  the full-covariance, non-elitist CMA-ES with the default population.
-- ``RNelderMead`` instead of ``NelderMead``. Nevergrad's ``NelderMead`` ignores the
-  seed and, once the simplex has collapsed, restarts from the best point and evaluates
-  it over and over (on the sphere in d = 2, 92 % of 2000 evaluations repeat a point).
-  ``RNelderMead`` restarts from a random point, like Nevergrad's ``RPowell`` and
-  ``RCobyla``.
+- ``CMAstd``: CMA-ES with full covariance, non-elitist, default population size. It
+  starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`); with Nevergrad's
+  default of 0.024 it would be a local search from the centre. (Nevergrad's ``CMA`` is
+  not used: on a bounded domain it selects an elitist diagonal CMA-ES with a small
+  population.)
+- ``LBFGSB``: L-BFGS-B, a quasi-Newton method, with random restarts.
+- ``RPowell``: Powell's direction-set method with random restarts.
+- ``TwoPointsDE``: differential evolution.
+- ``RealSpacePSO``: particle swarm optimization. (Nevergrad's ``PSO`` is not used: it
+  moves particles in an arctan-transformed space, so on [0, 1]^d most of its points
+  lie on the boundary.)
 
-Two settings differ from Nevergrad's defaults:
+The first three are each the best optimizer on a different part of the benchmark
+problems. The population-based ``TwoPointsDE`` and ``RealSpacePSO`` rarely are, but
+how well they do relative to the others differs between problems, which makes the
+portfolio's results a finer measure of problem similarity. Any other Nevergrad
+optimizer can still be run by name. The portfolio is identified by its optimizer
+names and the Nevergrad version, which the executor records in every row.
 
-- Sampling is uniform on [0, 1]^d (:func:`unit_box`), so ``RandomSearch`` is uniform
-  random search; Nevergrad's bounded ``Array`` samples around the centre.
-- ``CMAstd`` starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`) instead
-  of Nevergrad's 0.024, with which it is a local search from the centre.
+Sampling, e.g. of initial populations, is uniform on [0, 1]^d (:func:`unit_box`);
+Nevergrad's bounded ``Array`` samples around the centre.
 """
 
 from __future__ import annotations
@@ -37,7 +40,6 @@ import nevergrad as ng
 import numpy as np
 from nevergrad.optimization.base import ConfiguredOptimizer, Optimizer
 from nevergrad.optimization.optimizerlib import ParametrizedCMA
-from nevergrad.optimization.recastlib import NonObjectOptimizer
 
 from bench_atlas.problems import Problem
 
@@ -78,15 +80,10 @@ def _cmastd(parametrization: ng.p.Array, budget: int, num_workers: int) -> Optim
 
 PORTFOLIO: dict[str, OptimizerClass] = {
     "CMAstd": _cmastd,
-    "DiagonalCMA": ng.optimizers.registry["DiagonalCMA"],
     "TwoPointsDE": ng.optimizers.registry["TwoPointsDE"],
-    "PSO": ng.optimizers.registry["PSO"],
-    "RNelderMead": NonObjectOptimizer(method="Nelder-Mead", random_restart=True).set_name(
-        "RNelderMead"
-    ),
+    "RealSpacePSO": ng.optimizers.registry["RealSpacePSO"],
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
-    "OnePlusOne": ng.optimizers.registry["OnePlusOne"],
-    "RandomSearch": ng.optimizers.registry["RandomSearch"],
+    "RPowell": ng.optimizers.registry["RPowell"],
 }
 
 

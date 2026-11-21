@@ -68,7 +68,7 @@ def test_replay_equals_live_ioh_log(tmp_path: Path, function: int, optimizer: st
     _assert_replay_equals_live(tmp_path, bbob([2], [3])[function - 1], optimizer, 30)
 
 
-@pytest.mark.parametrize(("function", "optimizer"), [(8, "CMAstd"), (2, "RNelderMead")])
+@pytest.mark.parametrize(("function", "optimizer"), [(8, "CMAstd"), (2, "LBFGSB")])
 def test_replay_equals_live_ioh_log_after_the_target(
     tmp_path: Path, function: int, optimizer: str
 ) -> None:
