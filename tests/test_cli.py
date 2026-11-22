@@ -75,6 +75,15 @@ def test_ela_instances(tmp_path: Path) -> None:
     assert set(table["problem"].str.split("_").str[2]) == {"i3"}
 
 
+def test_ela_on_zigzag_and_cec2022(tmp_path: Path) -> None:
+    args = ["ela", "zigzag", "cec2022", "-d", "10", "-i", "37", "-n", "50", "-o", str(tmp_path)]
+    result = runner.invoke(app, args)
+    assert result.exit_code == 0, result.output
+    problems = set(pd.read_parquet(tmp_path / "ela.parquet")["problem"])
+    assert len(problems) == 4 + 12
+    assert {"zigzag_f1_i37_d10", "cec2022_f1001_i1_d10"} <= problems
+
+
 def test_ela_rejects_empty_sample(tmp_path: Path) -> None:
     result = runner.invoke(app, ["ela", "bbob", "-d", "2", "-n", "0", "-o", str(tmp_path)])
     assert result.exit_code == 2
