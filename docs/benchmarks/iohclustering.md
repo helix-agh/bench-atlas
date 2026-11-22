@@ -1,6 +1,6 @@
 # IOHClustering
 
-Forty k-means problems on real data [[Vermetten et al. 2025]](../references.md#vermetten2025clustering){ .ba-cite }: ten datasets
+Forty k-means problems on real data: ten datasets
 reduced to two features, each with $k \in \{2, 3, 5, 10\}$ clusters. A point holds
 the $k$ centroids on the min-max normalized data, so $d = 2k$, and the objective
 is the mean squared distance to the nearest centroid.

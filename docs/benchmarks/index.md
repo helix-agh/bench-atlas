@@ -24,9 +24,3 @@ Each suite is one function in [`bench_atlas.suites`](../reference/suites.md), na
 Every problem has an id `{suite}_f{function}_i{instance}_d{dimension}`, e.g.
 `bbob_f7_i4_d5`, `gnbg_ii_f6_i1_d30` or `zigzag_f2_i37_d10`. Ids are stable
 across versions and are the join key of all result tables.
-
-## Data that is downloaded, not shipped
-
-GNBG and zigzag data have no license that allows redistribution, so
-bench-atlas never vendors them. They are downloaded on first use from the
-authors' repositories at a **pinned commit** into `~/.cache/bench-atlas/`.

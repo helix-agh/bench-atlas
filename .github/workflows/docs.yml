@@ -37,7 +37,8 @@ jobs:
           path: site
 
   deploy:
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    # GitHub Pages needs a public repo on the Free plan; deploys start once it is public.
+    if: ${{ !github.event.repository.private && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:

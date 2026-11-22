@@ -1,6 +1,6 @@
 # Zigzag
 
-Four functions F1-F4 built on a parametrized zigzag pattern [[Kůdela and Matoušek 2022]](../references.md#kudela2022){ .ba-cite }, with
+Four functions F1-F4 built on a parametrized zigzag pattern, with
 one parametrization from a grid of 100:
 
 - $k \in \{1, 2, 4, 8, 16\}$, the number of zigzags,

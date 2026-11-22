@@ -6,7 +6,7 @@ global seed, so every row can be recomputed exactly.
 
 ## Exploratory landscape analysis
 
-ELA features [[Mersmann et al. 2011]](references.md#mersmann2011){ .ba-cite } are computed with
+ELA features are computed with
 [orivex](https://github.com/helix-agh/orivex) on a scrambled Sobol sample of
 $250 \cdot d$ points. Replicate $r$ of every problem of dimension $d$ uses the
 **same sample**, so differences between problems are not sampling noise.
@@ -18,8 +18,7 @@ uv run bench-atlas ela bbob ma_bbob gnbg_ii --replicates 10 -j -1
 ## Local optima networks
 
 Basin-hopping runs sample the local optima and the transitions between them;
-[lonkit](https://github.com/helix-agh/lonkit) builds the network
-[[Ochoa et al. 2008]](references.md#ochoa2008){ .ba-cite } and compresses it to a CMLON [[Adair et al. 2019]](references.md#adair2019){ .ba-cite }. Sampling and network
+[lonkit](https://github.com/helix-agh/lonkit) builds the network and compresses it to a CMLON. Sampling and network
 construction are separate: runs are stored at full precision, so a CMLON can be
 rebuilt at another precision without sampling again.
 
@@ -37,7 +36,7 @@ comparison.
 
 ## Optimizer portfolio
 
-Five optimizers from Nevergrad [[Rapin and Teytaud 2018]](references.md#rapin2018){ .ba-cite }, one per method class, each with a
+Five optimizers from Nevergrad, one per method class, each with a
 budget of $1000 \cdot d$ evaluations:
 
 | Optimizer | Method |
@@ -53,8 +52,7 @@ which it improved.
 
 ## AOCC
 
-Runs are scored with the normalized area over the convergence curve
-[[López-Ibáñez et al. 2024]](references.md#lopezibanez2024){ .ba-cite }. With $f^*$ the known optimum (or the best value of any run)
+Runs are scored with the normalized area over the convergence curve. With $f^*$ the known optimum (or the best value of any run)
 and $f_\text{med}$ the median of $f$ on the ELA sample, the error after $t$
 evaluations is
 

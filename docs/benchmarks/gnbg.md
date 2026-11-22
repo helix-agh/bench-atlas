@@ -1,15 +1,15 @@
 # GNBG-I, II, III
 
-The **G**eneralized **N**umerical **B**enchmark **G**enerator [[Yazdani et al. 2023]](../references.md#yazdani2023gnbg){ .ba-cite }
+The **G**eneralized **N**umerical **B**enchmark **G**enerator
 builds a function as the minimum over components, each a rotated, possibly
 asymmetric and multimodal basin with its own depth and shape. Three curated
 suites of d = 30 from it were used in competitions organized at GECCO and CEC.
 
 | Suite | Function | Problems | Competition |
 |---|---|---|---|
-| GNBG-I | `gnbg_i()` | f1-f24 | GECCO 2024 [[Gandomi et al. 2023]](../references.md#gandomi2023gnbgSuite){ .ba-cite } |
-| GNBG-II | `gnbg_ii()` | f1-f24 | GECCO and CEC 2025 [[GNBG-II 2025]](../references.md#gnbg2025){ .ba-cite } |
-| GNBG-III | `gnbg_iii()` | F1-F22 | GECCO and WCCI 2026 [[Salgotra et al. 2026]](../references.md#gnbg2026){ .ba-cite } |
+| GNBG-I | `gnbg_i()` | f1-f24 | GECCO 2024 |
+| GNBG-II | `gnbg_ii()` | f1-f24 | GECCO and CEC 2025 |
+| GNBG-III | `gnbg_iii()` | F1-F22 | GECCO and WCCI 2026 |
 
 ```python
 from bench_atlas.suites import gnbg_i, gnbg_ii, gnbg_iii

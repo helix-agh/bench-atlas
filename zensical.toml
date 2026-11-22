@@ -35,7 +35,6 @@ nav = [
     { "Suites" = "reference/suites.md" },
     { "Analyses" = "reference/analyses.md" },
   ] },
-  { "References" = "references.md" },
 ]
 
 [project.theme]
