@@ -11,7 +11,7 @@ and its AOCC over ``t_max`` evaluations is
 
 AOCC = 0 means "no better than a typical random point"; AOCC = 1 means reaching
 ``1e-8`` at once. This is the standard AOCC on ``f_best - f*`` with bounds
-``[1e-8 * delta, delta]``, ``delta = f_med - f*`` (:func:`aocc`). It is computed after
+``[1e-8 * delta, delta]``, ``delta = f_med - f*`` ([`aocc`][bench_atlas.aocc]). It is computed after
 the runs, from their stored best-so-far curves, because for problems without a known
 optimum ``f*`` is known only once all runs are done. Runs that stopped early keep their
 last best value; shorter budgets use prefixes of the same curves.
@@ -114,8 +114,8 @@ def normalized_aocc(
 ) -> float:
     """AOCC of a best-so-far curve over its first ``budget`` evaluations.
 
-    The curve is given as by :func:`bench_atlas.portfolio.optimize` and expanded with
-    :func:`bench_atlas.portfolio.best_so_far`, so a run that stopped early keeps its
+    The curve is given as by [`bench_atlas.portfolio.optimize`][bench_atlas.portfolio.optimize] and expanded with
+    [`bench_atlas.portfolio.best_so_far`][bench_atlas.portfolio.best_so_far], so a run that stopped early keeps its
     last best value. The error is normalized by ``f_med - f_opt``; NaN if that is not
     positive.
     """

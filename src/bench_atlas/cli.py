@@ -155,7 +155,7 @@ def _run(
     variants: Sequence[Mapping[str, Any]] | None = None,
     seed_per_dimension: bool = False,
 ) -> pd.DataFrame:
-    """:func:`executor.run` with progress on stderr and a clean error for a locked table."""
+    """[`executor.run`][bench_atlas.executor.run] with progress on stderr and a clean error for a locked table."""
     with _report_locked():
         return executor.run(
             analysis,
@@ -174,7 +174,7 @@ def _run(
 
 @contextmanager
 def _report_locked() -> Generator[None, None, None]:
-    """Turn :class:`store.LockedError` into a one-line message and exit code 1."""
+    """Turn [`store.LockedError`][bench_atlas.store.LockedError] into a one-line message and exit code 1."""
     try:
         yield
     except store.LockedError as error:

@@ -1,4 +1,4 @@
-"""Benchmark suites as lists of :class:`~bench_atlas.problems.Problem`."""
+"""Benchmark suites as lists of [`Problem`][bench_atlas.problems.Problem]."""
 
 from __future__ import annotations
 

@@ -1,14 +1,14 @@
 """Optimizer portfolio run with Nevergrad.
 
-:func:`optimize` runs one optimizer on a problem with Nevergrad's ask/tell interface
+[`optimize`][bench_atlas.portfolio.optimize] runs one optimizer on a problem with Nevergrad's ask/tell interface
 and returns its best-so-far curve, stored as the evaluations at which the best value
 improved. The curve is lossless and much shorter than one value per evaluation;
-:func:`best_so_far` expands it, e.g. to compute AOCC at several budgets.
+[`best_so_far`][bench_atlas.portfolio.best_so_far] expands it, e.g. to compute AOCC at several budgets.
 
-The portfolio (:data:`PORTFOLIO`) has one optimizer per method class:
+The portfolio ([`PORTFOLIO`][bench_atlas.portfolio.PORTFOLIO]) has one optimizer per method class:
 
 - ``CMAstd``: CMA-ES with full covariance, non-elitist, default population size. It
-  starts with a step size of 0.25 of the range (:data:`CMA_SIGMA0`); with Nevergrad's
+  starts with a step size of 0.25 of the range ([`CMA_SIGMA0`][bench_atlas.portfolio.CMA_SIGMA0]); with Nevergrad's
   default of 0.024 it would be a local search from the centre. (Nevergrad's ``CMA`` is
   not used: on a bounded domain it selects an elitist diagonal CMA-ES with a small
   population.)
@@ -26,7 +26,7 @@ portfolio's results a finer measure of problem similarity. Any other Nevergrad
 optimizer can still be run by name. The portfolio is identified by its optimizer
 names and the Nevergrad version, which the executor records in every row.
 
-Sampling, e.g. of initial populations, is uniform on [0, 1]^d (:func:`unit_box`);
+Sampling, e.g. of initial populations, is uniform on [0, 1]^d ([`unit_box`][bench_atlas.portfolio.unit_box]);
 Nevergrad's bounded ``Array`` samples around the centre.
 """
 
@@ -57,6 +57,7 @@ __all__ = [
 BUDGET_PER_DIMENSION = 1000
 SIGMA = 1 / 6
 CMA_SIGMA0 = 0.25
+"""Initial CMA-ES step size of ``CMAstd``, as a fraction of the [0, 1] range."""
 
 OptimizerClass = ConfiguredOptimizer | type[Optimizer] | Callable[..., Optimizer]
 
@@ -85,6 +86,7 @@ PORTFOLIO: dict[str, OptimizerClass] = {
     "LBFGSB": ng.optimizers.registry["LBFGSB"],
     "RPowell": ng.optimizers.registry["RPowell"],
 }
+"""The optimizer portfolio: name -> Nevergrad optimizer (see the module docstring)."""
 
 
 def optimize(
@@ -95,7 +97,7 @@ def optimize(
 ) -> dict[str, Any]:
     """One run of ``optimizer`` on ``problem`` with ``budget_per_dimension * d`` evaluations.
 
-    The search space is [0, 1]^d (:func:`unit_box`), and all randomness comes
+    The search space is [0, 1]^d ([`unit_box`][bench_atlas.portfolio.unit_box]), and all randomness comes
     from ``seed`` through the parametrization's ``random_state``. Points are
     evaluated one at a time; the run ends early only if the optimizer raises
     ``NevergradEarlyStopping``.
@@ -103,7 +105,7 @@ def optimize(
     Args:
         problem: Problem to minimize.
         seed: Seed of the run.
-        optimizer: Name in :data:`PORTFOLIO` or in Nevergrad's registry.
+        optimizer: Name in [`PORTFOLIO`][bench_atlas.portfolio.PORTFOLIO] or in Nevergrad's registry.
         budget_per_dimension: Evaluations per dimension.
 
     Returns:
@@ -158,7 +160,7 @@ def best_so_far(
 ) -> np.ndarray:
     """Best value after each of the first ``budget`` evaluations.
 
-    Expands a curve returned by :func:`optimize`. After the last improvement, and after
+    Expands a curve returned by [`optimize`][bench_atlas.portfolio.optimize]. After the last improvement, and after
     the end of a run that stopped early, the curve keeps its last value. Before the
     first improvement it is NaN.
     """
@@ -180,7 +182,7 @@ def unit_box(dimension: int) -> ng.p.Array:
 
 
 def optimizer_class(name: str) -> OptimizerClass:
-    """Optimizer ``name`` from :data:`PORTFOLIO`, else from Nevergrad's registry.
+    """Optimizer ``name`` from [`PORTFOLIO`][bench_atlas.portfolio.PORTFOLIO], else from Nevergrad's registry.
 
     Raises:
         KeyError: Unknown optimizer.
