@@ -64,6 +64,8 @@ class Suite(enum.StrEnum):
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
     iohclustering = "iohclustering"
+    zigzag = "zigzag"
+    cec2022 = "cec2022"
 
 
 # The atlas problem set: every command defaults to it, so features join per problem.
@@ -76,10 +78,14 @@ LON_INSTANCES = INSTANCES[:1]
 
 Suites = Annotated[list[Suite], typer.Argument(help="Benchmark suites.")]
 Dimensions = Annotated[
-    list[int], typer.Option("--dimension", "-d", help="Dimensions of BBOB and MA-BBOB.")
+    list[int],
+    typer.Option("--dimension", "-d", help="Dimensions of BBOB, MA-BBOB, Zigzag and CEC 2022."),
 ]
 Instances = Annotated[
-    list[int], typer.Option("--instance", "-i", help="Instances of BBOB and MA-BBOB.")
+    list[int],
+    typer.Option(
+        "--instance", "-i", help="Instances of BBOB and MA-BBOB, parametrizations of Zigzag."
+    ),
 ]
 Results = Annotated[
     Path, typer.Option("--results", "-o", help="Results folder, one Parquet file per analysis.")
@@ -183,11 +189,17 @@ def _report_locked() -> Generator[None, None, None]:
 
 
 def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> list[Problem]:
-    """Problems of the suites; only BBOB and MA-BBOB take dimensions and instances."""
+    """Problems of the suites.
+
+    BBOB, MA-BBOB and Zigzag take dimensions and instances (for Zigzag: parametrization
+    IDs), CEC 2022 only dimensions; the other suites take neither.
+    """
     problems = []
     for name in suite:
-        if name in (Suite.bbob, Suite.ma_bbob):
+        if name in (Suite.bbob, Suite.ma_bbob, Suite.zigzag):
             problems += getattr(suites, name.value)(dimension, instance)
+        elif name == Suite.cec2022:
+            problems += suites.cec2022(dimension)
         else:
             problems += getattr(suites, name.value)()
     return problems
