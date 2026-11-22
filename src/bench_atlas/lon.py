@@ -1,8 +1,8 @@
 """Local optima network (LON) features computed with lonkit.
 
-Sampling and network construction are separate. :func:`sample_run` runs one
+Sampling and network construction are separate. [`sample_run`][bench_atlas.lon.sample_run] runs one
 basin-hopping run and returns the chain of local optima it accepted, at full
-precision. :func:`cmlon_from_runs` rounds the optima of many runs to the chosen
+precision. [`cmlon_from_runs`][bench_atlas.lon.cmlon_from_runs] rounds the optima of many runs to the chosen
 precision, builds the LON from them and compresses it to a CMLON. The precision does
 not affect the search, so a CMLON can be rebuilt at another precision without
 sampling again, and the runs of one problem can be sampled in parallel.
