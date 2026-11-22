@@ -43,9 +43,14 @@ uv run bench-atlas run bbob -j -1             # optimizer portfolio
 uv run bench-atlas aocc                       # AOCC from the stored runs
 ```
 
-By default every command runs on the **atlas problem set**: d = 2, 5, 10, 20, 40
+By default `ela` and `run` use the **atlas problem set**: d = 2, 5, 10, 20, 40
 and instances 1-5 for BBOB and MA-BBOB; GNBG suites have a fixed d = 30 and a
-single instance. Use `--dimension/-d` and `--instance/-i` to narrow it down.
+single instance. Narrow it down with `--dimension/-d` and `--instance/-i`. The
+exceptions:
+
+- `lon` defaults to d = 2, 5, 10 and instance 1 (LON is expensive).
+- `timing` always uses instance 1 and takes only `--dimension/-d`.
+- `aocc` selects no problems: it scores the runs already stored in the results folder.
 
 !!! note
 
