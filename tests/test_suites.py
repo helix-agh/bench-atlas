@@ -4,8 +4,8 @@ import ioh
 import numpy as np
 import pytest
 
+from bench_atlas.benchmarks import bbob, ma_bbob
 from bench_atlas.problems import Problem, ProblemId, from_unit
-from bench_atlas.suites import bbob, ma_bbob
 
 DIMENSIONS = [2, 5]
 INSTANCES = [1, 2, 3]

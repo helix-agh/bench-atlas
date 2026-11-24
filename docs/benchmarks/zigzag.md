@@ -12,7 +12,7 @@ instance in the problem id: `zigzag_f2_i37_d10`. Its $k$, $m$ and $\lambda$ are
 kept in `problem.name`.
 
 ```python
-from bench_atlas.suites import zigzag
+from bench_atlas.benchmarks import zigzag
 
 zigzag(dimensions=[2, 10], parametrizations=range(1, 101))  # 800 problems
 ```

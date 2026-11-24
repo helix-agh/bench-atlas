@@ -12,7 +12,7 @@ import joblib
 import pandas as pd
 import typer
 
-from bench_atlas import __version__, executor, lon_pipeline, portfolio, store, suites
+from bench_atlas import __version__, benchmarks, executor, lon_pipeline, portfolio, store
 from bench_atlas import aocc as aocc_module
 from bench_atlas import ioh_logs as ioh_logs_module
 from bench_atlas import lon as lon_module
@@ -198,11 +198,11 @@ def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> 
     problems = []
     for name in suite:
         if name in (Suite.bbob, Suite.ma_bbob, Suite.zigzag):
-            problems += getattr(suites, name.value)(dimension, instance)
+            problems += getattr(benchmarks, name.value)(dimension, instance)
         elif name == Suite.cec2022:
-            problems += suites.cec2022(dimension)
+            problems += benchmarks.cec2022(dimension)
         else:
-            problems += getattr(suites, name.value)()
+            problems += getattr(benchmarks, name.value)()
     return problems
 
 

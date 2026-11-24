@@ -7,7 +7,7 @@ authors' curated suite of 50 recipes (d = 30) from four structural families:
 single component, single component with transforms, several components, and
 several blocks. The recipes are downloaded once into ``CACHE`` at a pinned
 commit; the objective is PORTAL's own code, vendored unchanged in
-:mod:`bench_atlas._portal` (MIT).
+:mod:`bench_atlas.benchmarks._portal` (MIT).
 
 Reference: D. Yazdani et al., "PORTAL: Controllable Landscape Generator for
 Continuous Optimization - Part I: Framework", arXiv:2512.00288, 2025.
@@ -25,9 +25,9 @@ from typing import Any
 
 import numpy as np
 
-from bench_atlas._portal.fitness import fitness
-from bench_atlas._portal.load_instance import load_instance_payload
-from bench_atlas._portal.optimum import global_optimum_value
+from bench_atlas.benchmarks._portal.fitness import fitness
+from bench_atlas.benchmarks._portal.load_instance import load_instance_payload
+from bench_atlas.benchmarks._portal.optimum import global_optimum_value
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
 __all__ = ["portal"]

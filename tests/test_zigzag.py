@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from bench_atlas.benchmarks.zigzag import zigzag
 from bench_atlas.problems import Problem, ProblemId, to_unit
-from bench_atlas.zigzag import zigzag
 
 DIMENSIONS = [2, 5, 10, 15, 20]
 REFERENCE = np.load(Path(__file__).parent / "data" / "zigzag_reference.npz")

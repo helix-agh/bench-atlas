@@ -63,8 +63,8 @@ def test_lock_is_released_on_error(tmp_path: Path) -> None:
 
 
 def _cmlon():
+    from bench_atlas.benchmarks import bbob
     from bench_atlas.lon import cmlon_from_runs, sample_run
-    from bench_atlas.suites import bbob
 
     problem = bbob([2], [1])[21]
     runs = [sample_run(problem, seed, n_iter_no_change=20) for seed in range(6)]

@@ -73,7 +73,7 @@ one row per problem so that the results join into a single atlas.
 
 ```python
 import numpy as np
-from bench_atlas.suites import bbob
+from bench_atlas.benchmarks import bbob
 
 problems = bbob(dimensions=[5], instances=[1])  # 24 problems
 f7 = problems[6]

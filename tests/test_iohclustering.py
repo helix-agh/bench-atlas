@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 from iohclustering import CLUSTER_METRICS, get_dataset
 
+from bench_atlas.benchmarks import iohclustering
 from bench_atlas.problems import ProblemId
-from bench_atlas.suites import iohclustering
 
 PROBLEMS = iohclustering()
 

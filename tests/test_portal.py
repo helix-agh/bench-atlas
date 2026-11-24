@@ -4,8 +4,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bench_atlas._portal.fitness import fitness
-from bench_atlas.portal import S50, portal
+from bench_atlas.benchmarks._portal.fitness import fitness
+from bench_atlas.benchmarks.portal import S50, portal
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
 REFERENCE = np.load(Path(__file__).parent / "data" / "portal_reference.npz")

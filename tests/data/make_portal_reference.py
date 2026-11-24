@@ -2,7 +2,7 @@
 
 Clones ``EvoMindLab/PORTAL`` at the pinned commit into a temporary folder and
 evaluates every recipe of ``Benchmark_S50`` with its ``portal_core.fitness``,
-independently of the copy vendored in ``bench_atlas._portal``. From the
+independently of the copy vendored in ``bench_atlas.benchmarks._portal``. From the
 repository root:
 
     uv run python tests/data/make_portal_reference.py
@@ -38,7 +38,7 @@ def uniform(index: int, d: int, n: int) -> np.ndarray:
 
 def main() -> None:
     sys.path.insert(0, str(DATA.parent.parent / "src"))
-    from bench_atlas.portal import S50
+    from bench_atlas.benchmarks.portal import S50
 
     with tempfile.TemporaryDirectory() as tmp:
         repo = Path(tmp) / "PORTAL"
