@@ -60,7 +60,7 @@ def run(
     A row holds the problem id, ``replicate``, ``seed``, the settings, library
     versions, ``evaluations`` (summed over the runs), ``n_runs``, the lonkit CMLON
     metrics and ``cmlon``, the name of the saved graph (see
-    :func:`bench_atlas.store.load_cmlon`). ``n_jobs`` parallelizes the runs; the
+    [`bench_atlas.store.load_cmlon`][bench_atlas.store.load_cmlon]). ``n_jobs`` parallelizes the runs; the
     CMLONs are built serially.
     """
     replicates = list(replicates)

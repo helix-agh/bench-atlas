@@ -16,7 +16,7 @@ MIN_BATCHES = 10
 
 
 def timing_features(problem: Problem, seed: int, batch_size: int = 1) -> dict[str, float]:
-    """``time_us``: :func:`evaluation_time` per point in microseconds."""
+    """``time_us``: [`evaluation_time`][bench_atlas.timing.evaluation_time] per point in microseconds."""
     return {"time_us": evaluation_time(problem, batch_size=batch_size, seed=seed) * 1e6}
 
 

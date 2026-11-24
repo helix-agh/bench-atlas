@@ -1,8 +1,8 @@
 """Benchmark problems.
 
-A :class:`Problem` is a vectorized objective on [0, 1]^d with a stable
-:class:`ProblemId`, an optional known optimum and an evaluation counter. IOH is
-used as a source of benchmark functions (:func:`from_ioh`), not as the problem
+A [`Problem`][bench_atlas.problems.Problem] is a vectorized objective on [0, 1]^d with a stable
+[`ProblemId`][bench_atlas.problems.ProblemId], an optional known optimum and an evaluation counter. IOH is
+used as a source of benchmark functions ([`from_ioh`][bench_atlas.problems.from_ioh]), not as the problem
 interface.
 """
 
@@ -177,11 +177,11 @@ def from_ioh(
     """Adapt an IOH real-valued single-objective problem.
 
     The id, name, bounds and optimum are read from the IOH problem. Evaluations
-    are counted by the returned :class:`Problem`, not by IOH's ``state``.
+    are counted by the returned [`Problem`][bench_atlas.problems.Problem], not by IOH's ``state``.
 
     Args:
         problem: IOH problem, e.g. from ``ioh.get_problem``.
-        suite: Suite name stored in the :class:`ProblemId`.
+        suite: Suite name stored in the [`ProblemId`][bench_atlas.problems.ProblemId].
         factory: Rebuilds the IOH problem after unpickling. Defaults to
             ``type(problem).create(function, instance, dimension)``, which works
             for native IOH problems such as BBOB.

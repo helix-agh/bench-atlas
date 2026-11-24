@@ -6,12 +6,12 @@ table on disk is always complete. A lock file guards against two runs writing th
 table at once, which would lose rows, so one analysis in one results folder is written
 by one run (one node) at a time. CMLON graphs are stored as GraphML files in
 ``<results>/cmlon/``, written the same way. IOH logs of the portfolio runs go to
-``<results>/ioh-logs/<suite>/<optimizer>/`` (see :mod:`bench_atlas.ioh_logs`). Table
+``<results>/ioh-logs/<suite>/<optimizer>/`` (see [`bench_atlas.ioh_logs`][bench_atlas.ioh_logs]). Table
 ``aocc`` is derived from ``runs`` and ``ela`` and replaced as a whole.
 
-The executor (:mod:`bench_atlas.executor`) reuses a stored row when its problem, global
+The executor ([`bench_atlas.executor`][bench_atlas.executor]) reuses a stored row when its problem, global
 seed, replicate, run and analysis settings match. Neither the analysis code nor the library versions are
-part of that key: the versions are recorded in ``version_*`` columns, and :func:`load`
+part of that key: the versions are recorded in ``version_*`` columns, and [`load`][bench_atlas.store.load]
 warns if a table mixes them. After a change to the analysis code, start from a fresh
 results folder or delete ``<results>/<analysis>.parquet``.
 """
@@ -130,7 +130,7 @@ def save_cmlon(results: Path, name: str, cmlon: CMLON) -> Path:
 
     GraphML keeps the vertex ``name``, ``Fitness`` and ``Count`` and the edge
     ``Count``; ``best_fitness``, ``eq_atol`` and ``minimize`` are stored as graph
-    attributes, so :func:`load_cmlon` restores everything needed to plot the network.
+    attributes, so [`load_cmlon`][bench_atlas.store.load_cmlon] restores everything needed to plot the network.
     """
     file = cmlon_path(results, name)
     file.parent.mkdir(parents=True, exist_ok=True)
@@ -146,7 +146,7 @@ def save_cmlon(results: Path, name: str, cmlon: CMLON) -> Path:
 
 
 def load_cmlon(results: Path, name: str) -> CMLON:
-    """CMLON saved by :func:`save_cmlon` (without its source LON)."""
+    """CMLON saved by [`save_cmlon`][bench_atlas.store.save_cmlon] (without its source LON)."""
     graph = ig.Graph.Read_GraphML(str(cmlon_path(results, name)))
     best, eq_atol, minimize = (graph[attribute] for attribute in _CMLON_ATTRIBUTES)
     for attribute in _CMLON_ATTRIBUTES:

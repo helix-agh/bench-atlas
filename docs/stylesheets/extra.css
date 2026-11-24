@@ -1,0 +1,59 @@
+/* Brand: monochrome lockup (#161616 / #EDEBE7) with an indigo accent. */
+:root {
+  --md-primary-fg-color: #161616;
+  --md-primary-fg-color--light: #2a2a2a;
+  --md-primary-fg-color--dark: #000;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #0f0f10;
+  --md-default-bg-color: #121214;
+}
+
+.ba-hero {
+  text-align: center;
+  padding: 2.5rem 0 1.5rem;
+}
+.ba-hero__logo {
+  width: min(420px, 85%);
+  margin-bottom: 1.5rem;
+}
+.md-typeset h1.ba-hero__title {
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0 auto 1rem;
+  max-width: 22ch;
+  color: var(--md-default-fg-color);
+}
+.ba-hero__lead {
+  font-size: 1.05rem;
+  max-width: 46rem;
+  margin: 0 auto 1.6rem;
+  color: var(--md-default-fg-color--light);
+}
+.ba-hero .md-button { margin: 0.25rem; }
+
+.md-typeset .grid.cards > ul > li {
+  border-radius: 0.6rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.md-typeset .grid.cards > ul > li:hover { transform: translateY(-2px); }
+
+
+@media screen and (max-width: 44.9375em) {
+  .md-typeset h1.ba-hero__title { font-size: 1.6rem; }
+}
+
+/* Two cards per row on desktop, so four cards make a 2 x 2 grid. */
+.md-typeset .grid.cards {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+}
+
+/* One header logo for both schemes: the mark is drawn in #161616, invert it on dark. */
+[data-md-color-scheme="slate"] .md-header .md-logo img { filter: invert(0.92); }
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary {
+  background-color: #edebe7;
+  border-color: #edebe7;
+  color: #161616;
+}

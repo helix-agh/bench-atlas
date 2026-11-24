@@ -30,7 +30,8 @@ def test_vendored_code_matches_official_code(problems: list[Problem]) -> None:
     for recipe, problem in zip(S50, problems, strict=True):
         x, y = REFERENCE[f"{recipe}_x"], REFERENCE[f"{recipe}_y"]
         values = [fitness(row, problem.function.instance) for row in x]
-        np.testing.assert_array_equal(values, y)
+        # Stored values can differ in the last bits across platforms/BLAS builds.
+        np.testing.assert_allclose(values, y, rtol=1e-12, atol=1e-12)
 
 
 def test_matches_official_code(problems: list[Problem]) -> None:

@@ -3,13 +3,13 @@
 One task is (problem, replicate), or (problem, replicate, run) for analyses that split
 a replicate into independent runs, repeated for every variant of the analysis settings
 (e.g. every optimizer). Its seed is derived from a global seed, the problem id, the
-replicate and the run (:func:`task_seed`), never from task order or worker, so results
+replicate and the run ([`task_seed`][bench_atlas.executor.task_seed]), never from task order or worker, so results
 don't depend on ``n_jobs``. With ``seed_per_dimension`` the problem's dimension replaces
 its id, so all problems of one dimension share the seeds (e.g. one ELA sample). A task
 is identified by the problem, the global seed, the replicate, the run, the analysis
 settings and the variant, not by its seed: seeds are 32-bit, so two tasks may share one.
 Tasks run with joblib, each with single-threaded BLAS / OpenMP. Finished rows are added
-to the analysis table of the results store (:mod:`bench_atlas.store`); tasks already in
+to the analysis table of the results store ([`bench_atlas.store`][bench_atlas.store]); tasks already in
 the table are skipped, so an interrupted run resumes where it stopped.
 """
 
@@ -60,7 +60,7 @@ def run(
 
     A row is ``problem, suite, function, instance, dimension, replicate`` (and ``run``
     if ``runs`` is given), ``global_seed, seed``, the ``params``, the variant, the
-    ``version_*`` of :data:`VERSIONED` and ``compute(problem, seed, **variant)``. Rows of
+    ``version_*`` of [`VERSIONED`][bench_atlas.executor.VERSIONED] and ``compute(problem, seed, **variant)``. Rows of
     the table whose ``(problem, global_seed, replicate, run, *params, *variant)`` match a
     task are reused, and a task requested twice (a repeated problem, replicate or run) is
     computed and returned once. New rows are saved at most every ``flush_seconds`` and
@@ -162,7 +162,7 @@ def _execute(
     """Run ``todo``, adding finished rows to ``table`` and saving it as they come.
 
     Every save writes ``table`` plus all rows computed so far, so a save retried after
-    an interrupted one (e.g. SIGTERM inside :func:`store.save`) writes the same table
+    an interrupted one (e.g. SIGTERM inside [`store.save`][bench_atlas.store.save]) writes the same table
     again instead of adding rows twice.
     """
     versions = {f"version_{name.replace('-', '_')}": version(name) for name in VERSIONED}
@@ -251,7 +251,7 @@ def _meta(
 def _key(
     problem: str, global_seed: int, replicate: int, run: int | None, params: Mapping[str, Any]
 ) -> tuple[Any, ...]:
-    """Identity of a task, in the order of :func:`_key_columns`."""
+    """Identity of a task, in the order of ``_key_columns``."""
     runs = () if run is None else (run,)
     return (problem, global_seed, replicate, *runs, *params.values())
 
