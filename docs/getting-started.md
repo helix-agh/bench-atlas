@@ -52,8 +52,13 @@ exceptions:
 - `timing` always uses instance 1 and takes only `--dimension/-d`.
 - `aocc` selects no problems: it scores the runs already stored in the results folder.
 
-!!! note
+!!! note "CEC 2022 and zigzag need `--dimension`"
 
-    The CLI currently exposes `bbob`, `ma_bbob`, `gnbg_i`, `gnbg_ii`,
-    `gnbg_iii` and `iohclustering`. CEC 2022 and zigzag are available from
-    Python.
+    The CLI takes all eight suites, but CEC 2022 exists only for d = 10, 20 and
+    zigzag only for d = 2, 5, 10, 15, 20, so the default dimensions fail for
+    them. For zigzag, `--instance/-i` selects the parametrizations (1-100):
+
+    ```bash
+    uv run bench-atlas ela cec2022 -d 10 -d 20
+    uv run bench-atlas ela zigzag -d 2 -d 5 -d 10 -i 1 -i 50 -i 100
+    ```
