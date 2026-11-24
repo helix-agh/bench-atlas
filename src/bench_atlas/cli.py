@@ -64,6 +64,7 @@ class Suite(enum.StrEnum):
     gnbg_ii = "gnbg_ii"
     gnbg_iii = "gnbg_iii"
     iohclustering = "iohclustering"
+    portal = "portal"
     zigzag = "zigzag"
     cec2022 = "cec2022"
 

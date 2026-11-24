@@ -11,10 +11,21 @@ import numpy as np
 from iohclustering import BASELINE_K_DIMENTIONS, CLUSTER_BASELINE_DATASETS, get_dataset
 
 from bench_atlas.gnbg import gnbg_i, gnbg_ii, gnbg_iii
+from bench_atlas.portal import portal
 from bench_atlas.problems import Problem, ProblemId, from_ioh
 from bench_atlas.zigzag import zigzag
 
-__all__ = ["bbob", "cec2022", "gnbg_i", "gnbg_ii", "gnbg_iii", "iohclustering", "ma_bbob", "zigzag"]
+__all__ = [
+    "bbob",
+    "cec2022",
+    "gnbg_i",
+    "gnbg_ii",
+    "gnbg_iii",
+    "iohclustering",
+    "ma_bbob",
+    "portal",
+    "zigzag",
+]
 
 
 def bbob(dimensions: Iterable[int], instances: Iterable[int]) -> list[Problem]:
