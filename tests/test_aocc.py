@@ -139,6 +139,7 @@ def _scores(values: dict[str, list[float]], replicates: int = 1) -> pd.DataFrame
             "problem": f"p{i}",
             "optimizer": name,
             "replicate": r,
+            "budget_per_dimension": 10,
             "aocc_10d": v,
         }
         for name, column in values.items()
@@ -171,3 +172,10 @@ def test_gap_skips_incomplete_problems_and_is_reproducible() -> None:
     first, second = aocc.sbs_vbs_gap(scores), aocc.sbs_vbs_gap(scores)
     assert first.iloc[0]["problems"] == 2
     pd.testing.assert_frame_equal(first, second)
+
+
+def test_gap_rejects_mixed_run_budgets() -> None:
+    scores = _scores({"A": [0.9, 0.2], "B": [0.1, 0.8]}, replicates=2)
+    scores.loc[scores["replicate"] == 1, "budget_per_dimension"] = 1000
+    with pytest.raises(ValueError, match=r"several budgets per dimension \[10, 1000\]"):
+        aocc.sbs_vbs_gap(scores)

@@ -128,7 +128,17 @@ def sbs_vbs_gap(table: pd.DataFrame, resamples: int = 1000, seed: int = 0) -> pd
         ``budget_per_dimension``, ``problems``, ``sbs`` (its name), ``sbs_aocc``,
         ``vbs_aocc``, ``gap``, ``gap_low`` and ``gap_high``. Problems without an AOCC
         for every optimizer are left out.
+
+    Raises:
+        ValueError: ``table`` mixes runs of several budgets per dimension; filter it to
+            one first, since a run's budget changes the optimizer's behaviour.
     """
+    run_budgets = sorted(int(b) for b in table["budget_per_dimension"].unique())
+    if len(run_budgets) > 1:
+        raise ValueError(
+            f"Runs with several budgets per dimension {run_budgets}; select one, e.g. "
+            "table[table['budget_per_dimension'] == 1000]."
+        )
     rng = np.random.default_rng(seed)
     budgets = [c for c in table.columns if c.startswith("aocc_") and c.endswith("d")]
     means = table.groupby(["suite", "dimension", "problem", "optimizer"])[budgets].mean()
