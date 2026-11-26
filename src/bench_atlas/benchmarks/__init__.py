@@ -9,6 +9,7 @@ from bench_atlas.benchmarks.cec2022 import cec2022
 from bench_atlas.benchmarks.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.benchmarks.iohclustering import iohclustering
 from bench_atlas.benchmarks.portal import portal
+from bench_atlas.benchmarks.random_trees import random_trees
 from bench_atlas.benchmarks.zigzag import zigzag
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "iohclustering",
     "ma_bbob",
     "portal",
+    "random_trees",
     "zigzag",
 ]
