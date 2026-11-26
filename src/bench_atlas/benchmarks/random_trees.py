@@ -3,9 +3,10 @@
 The tree generator, the expression builder and the acceptance filter are a port of
 ``nikivanstein/doe2vec`` (van Stein et al. 2023; ``modulesRandFunc`` and
 ``generateData``, commit 4d498c2), which ports the MATLAB generator of Tian et al.
-2020 to Python. The port keeps doe2vec's logic and its order of random draws, so the
-same seed gives the same expression string; only the global ``random`` and
-``np.random`` states are replaced by generators passed in.
+2020 to Python. The port keeps doe2vec's logic and its order of random draws; the
+global ``random`` and ``np.random`` states are replaced by generators passed in.
+Three operands are fixed (docs/random-trees.md), so the same seed gives doe2vec's
+expression string up to those operands.
 
 doe2vec is distributed under the MIT License:
 
@@ -60,8 +61,14 @@ __all__ = ["random_trees"]
 MIN_LENGTH = 6
 MAX_LENGTH = 16
 
+
+def _dot(x: np.ndarray, m: np.ndarray) -> np.ndarray:
+    # einsum, unlike np.dot (BLAS), gives each row bitwise independently of the batch.
+    return np.einsum("ij,jk->ik", x, m)
+
+
 # Names an expression may use; no builtins.
-_NAMESPACE = {"__builtins__": {}, "np": np, "abs": np.abs, "len": len, "range": range}
+_NAMESPACE = {"__builtins__": {}, "np": np, "abs": np.abs, "len": len, "range": range, "dot": _dot}
 
 
 class _Node:
@@ -269,11 +276,11 @@ _UNARY = {
     29: "np.cos(2*np.pi*{})",
     30: "np.log(abs({}))",
     31: "np.exp({})",
-    32: "np.sum({}, axis=1)",
-    33: "np.mean({}, axis=1)",
+    32: "np.sum({}, axis=1, keepdims=True)",
+    33: "np.mean({}, axis=1, keepdims=True)",
     34: "np.cumsum({}, axis=1)",
-    35: "np.prod({}, axis=1)",
-    36: "np.amax({}, axis=1)",
+    35: "np.prod({}, axis=1, keepdims=True)",
+    36: "np.amax({}, axis=1, keepdims=True)",
 }
 _BINARY = {11: "+", 12: "-", 13: "*", 14: "/"}
 
@@ -281,7 +288,12 @@ _BINARY = {11: "+", 12: "-", 13: "*", 14: "/"}
 def _expression(
     postfix: list[int], rng: random.Random, np_rng: np.random.RandomState, d: int
 ) -> str:
-    """doe2vec ``generate_exp2fun`` without the noise operand 7."""
+    """doe2vec ``generate_exp2fun`` without the noise operand 7, with shapes fixed.
+
+    In doe2vec x1 and the reductions sum, mean, prod and max are ``(n,)`` and the
+    translated vector works only at d = 2; here they are ``(n, 1)`` and ``(n, d)``.
+    The rotated vector uses ``_dot``.
+    """
     stack: list[str] = []
     for item in postfix:
         if item == 1:
@@ -289,13 +301,11 @@ def _expression(
         elif item == 2:
             stack.append("array_x")
         elif item == 3:
-            stack.append("array_x[:,0]")
+            stack.append("array_x[:,:1]")
         elif item == 4:
-            stack.append(
-                "(np.vstack((array_x[:,1:].ravel(), np.zeros((len(array_x), 1)).ravel())).T)"
-            )
+            stack.append("(np.hstack((array_x[:,1:], np.zeros((len(array_x), 1)))))")
         elif item == 5:
-            stack.append(f"(np.dot(array_x, np.array({np_rng.rand(d, d).tolist()})))")
+            stack.append(f"(dot(array_x, np.array({np_rng.rand(d, d).tolist()})))")
         elif item == 6:
             stack.append("(np.array(range(1, array_x.shape[1]+1)))")
         elif item in _BINARY:
@@ -334,7 +344,8 @@ class _RandomTree:
     expression: str
 
     def __call__(self, x: np.ndarray) -> np.ndarray:
-        return eval(_compile(self.expression), _NAMESPACE, {"array_x": x})
+        # Scalars are (n, 1); anything else fails here and the filter rejects it.
+        return eval(_compile(self.expression), _NAMESPACE, {"array_x": x}).reshape(len(x))
 
 
 def _accepted(function: _RandomTree, sample: np.ndarray) -> bool:
@@ -366,11 +377,8 @@ def random_trees(dimensions: Iterable[int], instances: Iterable[int]) -> list[Pr
     on its sample, the first 2^8 points of the unscrambled Sobol sequence (which
     include the origin); see ``_accepted``. Trees with the noise operand are rejected
     too. The optimum is unknown. Ids are ``random_trees_f1_i{i}_d{d}``; the expression
-    is ``problem.function.expression``.
-
-    doe2vec's shape bugs are kept for fidelity, so many draws raise and are rejected:
-    x1 is ``(n,)`` and fails against the ``(n, d)`` vector, and the translated vector
-    works only at d = 2.
+    is ``problem.function.expression``. doe2vec's shape bugs are fixed, see
+    docs/random-trees.md.
     """
     problems = []
     for instance in instances:
