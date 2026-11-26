@@ -15,6 +15,8 @@ AOCC = 0 means "no better than a typical random point"; AOCC = 1 means reaching
 the runs, from their stored best-so-far curves, because for problems without a known
 optimum ``f*`` is known only once all runs are done. Runs that stopped early keep their
 last best value; shorter budgets use prefixes of the same curves.
+
+[`sbs_vbs_gap`][bench_atlas.aocc.sbs_vbs_gap] turns the AOCC table into one complementarity number per suite.
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ __all__ = [
     "aocc",
     "aocc_table",
     "normalized_aocc",
+    "sbs_vbs_gap",
 ]
 
 PRECISION = 1e-8
@@ -103,6 +106,70 @@ def aocc_table(
         rows.append(row)
     columns = [*_RUN_COLUMNS, "f_opt", "f_opt_known", "f_med", *(f"aocc_{m}d" for m in budgets)]
     return pd.DataFrame(rows, columns=columns)
+
+
+def sbs_vbs_gap(table: pd.DataFrame, resamples: int = 1000, seed: int = 0) -> pd.DataFrame:
+    """Gap between the virtual best and the single best optimizer of every suite.
+
+    With ``s_p(a)`` the AOCC of optimizer ``a`` on problem ``p``, averaged over
+    replicates, ``VBS = mean_p max_a s_p(a)``, ``SBS = max_a mean_p s_p(a)`` and
+    ``gap = VBS - SBS`` in [0, 1]. A large gap means that different problems of the
+    suite favour different optimizers; 0 means one optimizer is best on all of them.
+    The gap depends on the portfolio, and it is biased low for small suites because
+    the SBS is chosen on the problems it is scored on.
+
+    Args:
+        table: AOCC table as returned by [`aocc_table`][bench_atlas.aocc.aocc_table].
+        resamples: Bootstrap resamples of the problems for the 95 % interval.
+        seed: Seed of the bootstrap.
+
+    Returns:
+        One row per suite, dimension and budget: ``suite``, ``dimension``,
+        ``budget_per_dimension``, ``problems``, ``sbs`` (its name), ``sbs_aocc``,
+        ``vbs_aocc``, ``gap``, ``gap_low`` and ``gap_high``. Problems without an AOCC
+        for every optimizer are left out.
+
+    Raises:
+        ValueError: ``table`` mixes runs of several budgets per dimension; filter it to
+            one first, since a run's budget changes the optimizer's behaviour.
+    """
+    run_budgets = sorted(int(b) for b in table["budget_per_dimension"].unique())
+    if len(run_budgets) > 1:
+        raise ValueError(
+            f"Runs with several budgets per dimension {run_budgets}; select one, e.g. "
+            "table[table['budget_per_dimension'] == 1000]."
+        )
+    rng = np.random.default_rng(seed)
+    budgets = [c for c in table.columns if c.startswith("aocc_") and c.endswith("d")]
+    means = table.groupby(["suite", "dimension", "problem", "optimizer"])[budgets].mean()
+    rows = []
+    for column in budgets:
+        wide = means[column].unstack("optimizer")
+        for (suite, dimension), scores in wide.groupby(level=["suite", "dimension"]):
+            scores = scores.dropna()
+            if scores.empty:
+                continue
+            values = scores.to_numpy()
+            optimizer_means = values.mean(axis=0)
+            vbs, sbs = values.max(axis=1).mean(), optimizer_means.max()
+            samples = values[rng.integers(len(values), size=(resamples, len(values)))]
+            gaps = samples.max(axis=2).mean(axis=1) - samples.mean(axis=1).max(axis=1)
+            low, high = np.percentile(gaps, [2.5, 97.5])
+            rows.append(
+                {
+                    "suite": suite,
+                    "dimension": dimension,
+                    "budget_per_dimension": int(column[len("aocc_") : -1]),
+                    "problems": len(values),
+                    "sbs": scores.columns[optimizer_means.argmax()],
+                    "sbs_aocc": float(sbs),
+                    "vbs_aocc": float(vbs),
+                    "gap": float(vbs - sbs),
+                    "gap_low": float(low),
+                    "gap_high": float(high),
+                }
+            )
+    return pd.DataFrame(rows)
 
 
 def normalized_aocc(

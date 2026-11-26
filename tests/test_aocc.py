@@ -129,3 +129,53 @@ def test_table_needs_ela() -> None:
         aocc.aocc_table(runs, pd.DataFrame(_ela("p1", [2.0], 10)))
     with pytest.raises(ValueError, match="p1"):
         aocc.aocc_table(runs, pd.DataFrame())
+
+
+def _scores(values: dict[str, list[float]], replicates: int = 1) -> pd.DataFrame:
+    rows = [
+        {
+            "suite": "s",
+            "dimension": 2,
+            "problem": f"p{i}",
+            "optimizer": name,
+            "replicate": r,
+            "budget_per_dimension": 10,
+            "aocc_10d": v,
+        }
+        for name, column in values.items()
+        for i, v in enumerate(column)
+        for r in range(replicates)
+    ]
+    return pd.DataFrame(rows)
+
+
+def test_gap_is_zero_if_one_optimizer_wins_everywhere() -> None:
+    gap = aocc.sbs_vbs_gap(_scores({"A": [0.9, 0.5, 0.7], "B": [0.1, 0.4, 0.7]}))
+    row = gap.iloc[0]
+    assert (row["sbs"], row["problems"], row["budget_per_dimension"]) == ("A", 3, 10)
+    assert row["sbs_aocc"] == row["vbs_aocc"] == pytest.approx(0.7)
+    assert row["gap"] == row["gap_low"] == row["gap_high"] == 0.0
+
+
+def test_gap_of_two_complementary_optimizers() -> None:
+    delta = 0.4
+    a = [0.5 + delta, 0.5, 0.5 + delta, 0.5]
+    b = [0.5, 0.5 + delta, 0.5, 0.5 + delta]
+    row = aocc.sbs_vbs_gap(_scores({"A": a, "B": b}, replicates=3)).iloc[0]
+    assert row["vbs_aocc"] == pytest.approx(0.5 + delta)
+    assert row["gap"] == pytest.approx(delta / 2)
+    assert 0.0 <= row["gap_low"] <= row["gap"] <= row["gap_high"]
+
+
+def test_gap_skips_incomplete_problems_and_is_reproducible() -> None:
+    scores = _scores({"A": [0.9, 0.2, 0.3], "B": [0.1, 0.8, np.nan]})
+    first, second = aocc.sbs_vbs_gap(scores), aocc.sbs_vbs_gap(scores)
+    assert first.iloc[0]["problems"] == 2
+    pd.testing.assert_frame_equal(first, second)
+
+
+def test_gap_rejects_mixed_run_budgets() -> None:
+    scores = _scores({"A": [0.9, 0.2], "B": [0.1, 0.8]}, replicates=2)
+    scores.loc[scores["replicate"] == 1, "budget_per_dimension"] = 1000
+    with pytest.raises(ValueError, match=r"several budgets per dimension \[10, 1000\]"):
+        aocc.sbs_vbs_gap(scores)
