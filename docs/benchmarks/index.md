@@ -15,7 +15,7 @@ implementation** (IOH, the authors' Python, MATLAB or C code).
 | [Zigzag](zigzag.md) | 4 per (d, parametrization) | 2, 5, 10, 15, 20 | 1-100 | :lucide-check: | authors' code |
 | [IOHClustering](iohclustering.md) | 40 | 4, 6, 10, 20 | 1 | :lucide-x: | `iohclustering` |
 
-Each suite is one function in [`bench_atlas.suites`](../reference/suites.md), named like its id prefix:
+Each suite is one function in [`bench_atlas.benchmarks`](../reference/benchmarks.md), named like its id prefix:
 `bbob()`, `ma_bbob()`, `cec2022()`, `gnbg_i()`, `gnbg_ii()`, `gnbg_iii()`, `zigzag()` and
 `iohclustering()`.
 

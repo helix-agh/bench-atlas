@@ -20,7 +20,7 @@ Every suite is a plain function that returns a list of
 
 ```python
 import numpy as np
-from bench_atlas.suites import bbob, gnbg_ii
+from bench_atlas.benchmarks import bbob, gnbg_ii
 
 problems = bbob(dimensions=[2, 5], instances=[1, 2, 3]) + gnbg_ii()
 

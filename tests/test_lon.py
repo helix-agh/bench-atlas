@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from lonkit import BasinHoppingSampler, BasinHoppingSamplerConfig, LONConfig
 
+from bench_atlas.benchmarks import bbob
 from bench_atlas.lon import (
     STEP_SIZE,
     _accepted_optima,
@@ -11,7 +12,6 @@ from bench_atlas.lon import (
     sample_run,
 )
 from bench_atlas.problems import Problem, ProblemId
-from bench_atlas.suites import bbob
 
 
 def _sphere(x: np.ndarray) -> np.ndarray:

@@ -12,7 +12,7 @@ suites of d = 30 from it were used in competitions organized at GECCO and CEC.
 | GNBG-III | `gnbg_iii()` | F1-F22 | GECCO and WCCI 2026 |
 
 ```python
-from bench_atlas.suites import gnbg_i, gnbg_ii, gnbg_iii
+from bench_atlas.benchmarks import gnbg_i, gnbg_ii, gnbg_iii
 
 problems = gnbg_i() + gnbg_ii() + gnbg_iii()  # 70 problems, d = 30
 ```

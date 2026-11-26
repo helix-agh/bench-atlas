@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from bench_atlas import ioh_logs, portfolio, store
+from bench_atlas.benchmarks import bbob
 from bench_atlas.problems import Problem, ProblemId
-from bench_atlas.suites import bbob
 from tests.test_portfolio import _StopAfter
 
 

@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from bench_atlas import executor, portfolio
+from bench_atlas.benchmarks import bbob
 from bench_atlas.problems import Problem, ProblemId
-from bench_atlas.suites import bbob
 
 
 def _sphere(x: np.ndarray) -> np.ndarray:

@@ -5,8 +5,8 @@ import ioh
 import numpy as np
 import pytest
 
+from bench_atlas.benchmarks import cec2022
 from bench_atlas.problems import Problem, ProblemId, from_unit
-from bench_atlas.suites import cec2022
 
 REFERENCE = np.load(Path(__file__).parent / "data" / "cec2022_reference.npz")
 DIFFER_FROM_CODE = (3, 5, 9)  # IOH follows the technical report, not the code

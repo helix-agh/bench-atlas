@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from bench_atlas.gnbg import gnbg_i, gnbg_ii, gnbg_iii
+from bench_atlas.benchmarks.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.problems import Problem, ProblemId, to_unit
 
 

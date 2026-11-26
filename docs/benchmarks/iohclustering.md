@@ -6,7 +6,7 @@ the $k$ centroids on the min-max normalized data, so $d = 2k$, and the objective
 is the mean squared distance to the nearest centroid.
 
 ```python
-from bench_atlas.suites import iohclustering
+from bench_atlas.benchmarks import iohclustering
 
 iohclustering()  # 40 problems, d = 4, 6, 10, 20
 ```

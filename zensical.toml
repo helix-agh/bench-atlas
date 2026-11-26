@@ -32,7 +32,7 @@ nav = [
   { "Analyses" = "analyses.md" },
   { "API reference" = [
     { "Problems" = "reference/problems.md" },
-    { "Suites" = "reference/suites.md" },
+    { "Benchmarks" = "reference/benchmarks.md" },
     { "Analyses" = "reference/analyses.md" },
   ] },
 ]
