@@ -16,6 +16,10 @@
     options:
       members: [gnbg_i, gnbg_ii, gnbg_iii]
 
+::: bench_atlas.benchmarks.msg
+    options:
+      members: [msg]
+
 ::: bench_atlas.benchmarks.zigzag
     options:
       members: [zigzag]

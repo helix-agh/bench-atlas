@@ -67,6 +67,7 @@ class Suite(enum.StrEnum):
     portal = "portal"
     zigzag = "zigzag"
     cec2022 = "cec2022"
+    msg = "msg"
 
 
 # The atlas problem set: every command defaults to it, so features join per problem.
@@ -80,12 +81,14 @@ LON_INSTANCES = INSTANCES[:1]
 Suites = Annotated[list[Suite], typer.Argument(help="Benchmark suites.")]
 Dimensions = Annotated[
     list[int],
-    typer.Option("--dimension", "-d", help="Dimensions of BBOB, MA-BBOB, Zigzag and CEC 2022."),
+    typer.Option(
+        "--dimension", "-d", help="Dimensions of BBOB, MA-BBOB, MSG, Zigzag and CEC 2022."
+    ),
 ]
 Instances = Annotated[
     list[int],
     typer.Option(
-        "--instance", "-i", help="Instances of BBOB and MA-BBOB, parametrizations of Zigzag."
+        "--instance", "-i", help="Instances of BBOB, MA-BBOB and MSG, parametrizations of Zigzag."
     ),
 ]
 Results = Annotated[
@@ -192,12 +195,12 @@ def _report_locked() -> Generator[None, None, None]:
 def _problems(suite: list[Suite], dimension: list[int], instance: list[int]) -> list[Problem]:
     """Problems of the suites.
 
-    BBOB, MA-BBOB and Zigzag take dimensions and instances (for Zigzag: parametrization
+    BBOB, MA-BBOB, MSG and Zigzag take dimensions and instances (for Zigzag: parametrization
     IDs), CEC 2022 only dimensions; the other suites take neither.
     """
     problems = []
     for name in suite:
-        if name in (Suite.bbob, Suite.ma_bbob, Suite.zigzag):
+        if name in (Suite.bbob, Suite.ma_bbob, Suite.msg, Suite.zigzag):
             problems += getattr(benchmarks, name.value)(dimension, instance)
         elif name == Suite.cec2022:
             problems += benchmarks.cec2022(dimension)

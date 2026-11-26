@@ -8,6 +8,7 @@ from bench_atlas.benchmarks.bbob import bbob, ma_bbob
 from bench_atlas.benchmarks.cec2022 import cec2022
 from bench_atlas.benchmarks.gnbg import gnbg_i, gnbg_ii, gnbg_iii
 from bench_atlas.benchmarks.iohclustering import iohclustering
+from bench_atlas.benchmarks.msg import msg
 from bench_atlas.benchmarks.portal import portal
 from bench_atlas.benchmarks.zigzag import zigzag
 
@@ -19,6 +20,7 @@ __all__ = [
     "gnbg_iii",
     "iohclustering",
     "ma_bbob",
+    "msg",
     "portal",
     "zigzag",
 ]
