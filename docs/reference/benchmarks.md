@@ -16,6 +16,10 @@
     options:
       members: [gnbg_i, gnbg_ii, gnbg_iii]
 
+::: bench_atlas.benchmarks.random_trees
+    options:
+      members: [random_trees]
+
 ::: bench_atlas.benchmarks.zigzag
     options:
       members: [zigzag]
